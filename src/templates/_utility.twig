@@ -1,0 +1,106 @@
+{% import _self as m %}
+{% macro state(status, runsToLearn) %}
+	{% set labels = {
+		ok: ['green', 'OK'|t('cron-guard')],
+		failing: ['red', 'Failed'|t('cron-guard')],
+		stuck: ['red', 'Stuck'|t('cron-guard')],
+		overdue: ['red', 'Missed'|t('cron-guard')],
+		slow: ['orange', 'Slow'|t('cron-guard')],
+		learning: ['light', 'Learning'|t('cron-guard')],
+		irregular: ['light', 'No schedule'|t('cron-guard')],
+		muted: ['disabled', 'Muted'|t('cron-guard')],
+	} %}
+	{% set label = labels[status.state] %}
+	<span class="cron-guard-state"><span class="status {{ label[0] }}" aria-hidden="true"></span>{{ label[1] }}</span>
+{% endmacro %}
+
+<div class="cron-guard">
+	{% if not statuses|length %}
+		<div class="readable">
+			<h2>{{ 'No scheduled commands recorded yet'|t('cron-guard') }}</h2>
+			<p>{{ 'Cron Guard records each Craft command your server’s cron runs, learns how often it runs, and tells you when one fails, gets stuck or stops running. There’s nothing to set up: commands appear here after their first run.'|t('cron-guard') }}</p>
+			<p>{{ 'If your site should have scheduled commands, check its crontab has lines like these:'|t('cron-guard') }}</p>
+			<pre class="cron-guard-code"><code>* * * * * cd /path/to/site && php craft queue/run
+0 3 * * * cd /path/to/site && php craft gc</code></pre>
+			<p class="light">{{ 'Commands typed in a terminal aren’t recorded, so testing by hand won’t add one.'|t('cron-guard') }}</p>
+		</div>
+	{% else %}
+		{% set problemCount = statuses|filter(s => s.state in problems)|length %}
+		{% if lastAny and now|date('U') - lastAny > 86400 and statuses|filter(s => s.interval and s.interval < 86400)|length %}
+			<div class="cron-guard-banner">
+				<strong>{{ 'No command has run for {time}.'|t('cron-guard', { time: checker.duration(now|date('U') - lastAny) }) }}</strong>
+				{{ 'Cron itself has most likely stopped: check the server’s crontab, or the scheduler on your host.'|t('cron-guard') }}
+			</div>
+		{% endif %}
+
+		<div class="cron-guard-head">
+			<p class="{{ problemCount ? 'error' : 'success' }}">
+				{% if problemCount %}
+					{{ '{count, plural, =1{One command needs a look.} other{# commands need a look.}}'|t('cron-guard', { count: problemCount }) }}
+				{% else %}
+					{{ 'Every command is running as it should.'|t('cron-guard') }}
+				{% endif %}
+			</p>
+			<form method="post">
+				{{ csrfInput() }}{{ actionInput('cron-guard/commands/check') }}{{ redirectInput('utilities/cron-guard') }}
+				<button type="submit" class="btn">{{ 'Check now'|t('cron-guard') }}</button>
+			</form>
+		</div>
+
+		<div class="tablepane">
+			<table class="data fullwidth">
+				<thead>
+					<tr>
+						<th scope="col">{{ 'Command'|t('cron-guard') }}</th>
+						<th scope="col">{{ 'Status'|t('cron-guard') }}</th>
+						<th scope="col">{{ 'Runs'|t('cron-guard') }}</th>
+						<th scope="col">{{ 'Last run'|t('cron-guard') }}</th>
+						<th scope="col">{{ 'Usually takes'|t('cron-guard') }}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for status in statuses %}
+						<tr>
+							<th scope="row"><a href="{{ cpUrl('utilities/cron-guard', { command: status.id }) }}"><code>{{ status.command }}</code></a></th>
+							<td>
+								{{ m.state(status, runsToLearn) }}
+								{% if status.message %}<div class="smalltext light">{{ status.message }}</div>{% endif %}
+							</td>
+							<td>
+								{% if status.interval %}
+									{{ checker.every(status.interval) }}{% if not status.learnt %} <span class="light">({{ 'set in config'|t('cron-guard') }})</span>{% endif %}
+								{% elseif status.state == 'learning' or (status.state == 'muted' and status.runs < runsToLearn) %}
+									<span class="light">{{ 'Learning: {count} of {total} runs'|t('cron-guard', { count: status.runs, total: runsToLearn }) }}</span>
+								{% else %}
+									<span class="light">{{ 'Irregular'|t('cron-guard') }}</span>
+								{% endif %}
+							</td>
+							<td class="nowrap">
+								{% if status.lastStart %}
+									{{ '{time} ago'|t('cron-guard', { time: checker.duration(now|date('U') - status.lastStart) }) }}
+								{% endif %}
+							</td>
+							<td class="nowrap">{{ status.usualDuration is not null ? checker.duration(status.usualDuration) : '' }}</td>
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+		<p class="light smalltext">{{ '“Irregular” commands, such as ones run on deploy, are still reported when they fail, but never as missed.'|t('cron-guard') }}
+			{% if not settings.emailList()|length and not settings.chatWebhook and not settings.webhookUrl %}
+				<a href="{{ cpUrl('settings/plugins/cron-guard') }}">{{ 'Add where alerts go.'|t('cron-guard') }}</a>
+			{% endif %}
+		</p>
+	{% endif %}
+</div>
+
+{% css %}
+.cron-guard-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.cron-guard-head p { margin: 0; font-weight: 600; }
+.cron-guard-state { white-space: nowrap; }
+.cron-guard-state .status { margin-inline-end: 6px; }
+.cron-guard-banner { padding: 12px 16px; margin-bottom: 1rem; border-radius: var(--large-border-radius, 5px); background: var(--red-050, #fef2f2); color: var(--red-800, #991b1b); }
+.cron-guard-code { padding: 10px 14px; border-radius: var(--medium-border-radius, 4px); background: var(--gray-050, #f3f7fc); overflow-x: auto; }
+.cron-guard-runs td, .cron-guard-runs th { vertical-align: top; }
+.cron-guard-error { white-space: pre-wrap; word-break: break-word; max-width: 60ch; }
+{% endcss %}

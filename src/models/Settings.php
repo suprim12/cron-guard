@@ -1,0 +1,110 @@
+<?php
+/**
+ * Cron Guard plugin for Craft CMS
+ *
+ * @link      https://suprim.com.au
+ * @author suprim <support@suprim.com.au> <https://suprim.com.au>
+ * @copyright Copyright (c) 2026 suprim
+ */
+
+namespace suprim\cronguard\models;
+
+use craft\base\Model;
+use craft\helpers\App;
+
+/**
+ * Where alerts go and what isn’t watched are on the settings page; the rest is for config/cron-guard.php.
+ */
+class Settings extends Model
+{
+    /** Email addresses alerts go to, one a line or separated by commas. Environment variables work. */
+    public string $emails = '';
+
+    /** A Slack, Discord or Microsoft Teams incoming webhook URL. */
+    public string $chatWebhook = '';
+
+    /** A URL alerts are posted to as JSON. */
+    public string $webhookUrl = '';
+
+    /** Opens the health URL to uptime monitors that send it; empty keeps the health URL off. */
+    public string $healthToken = '';
+
+    /**
+     * Commands that aren’t watched, one a line, with * for any part (`resave/*`). Deploy and setup commands are left
+     * out by default, as they run when someone deploys, not on a schedule.
+     *
+     * @var string[]
+     */
+    public array $ignore = [
+        'help',
+        'up',
+        'on',
+        'off',
+        'install/*',
+        'setup/*',
+        'migrate/*',
+        'project-config/*',
+        'plugin/*',
+        'clear-caches/*',
+        'cache/*',
+        'queue/listen',
+        'cron-guard/*',
+    ];
+
+    // Config file only
+
+    /**
+     * Expected time between runs for commands whose schedule shouldn’t be learnt, by command or route, as a number
+     * of seconds or a string like '1 day'. `['db/backup' => '1 day']`.
+     *
+     * @var array<string, int|string>
+     */
+    public array $schedules = [];
+
+    /** Also watch commands run by hand in a terminal. */
+    public bool $watchInteractive = false;
+
+    /** Days of runs kept. */
+    public int $keepDays = 30;
+
+    /** Hours before a problem that hasn’t gone away is sent again; 0 sends it once. */
+    public int $remindHours = 24;
+
+    /** Minutes a run may take before it counts as stuck, unless it usually takes longer. */
+    public int $stuckMinutes = 60;
+
+    /** Run the check, at most every five minutes, after control panel and site requests too. */
+    public bool $checkFromWeb = true;
+
+    /**
+     * @return string[]
+     */
+    public function emailList(): array
+    {
+        $emails = preg_split('/[\s,;]+/', (string)App::parseEnv($this->emails), -1, PREG_SPLIT_NO_EMPTY);
+
+        return array_values(array_filter($emails, fn($email) => filter_var($email, FILTER_VALIDATE_EMAIL)));
+    }
+
+    protected function defineRules(): array
+    {
+        return [
+            [['emails', 'chatWebhook', 'webhookUrl', 'healthToken'], 'string'],
+            [['emails'], function($attribute) {
+                foreach (preg_split('/[\s,;]+/', (string)App::parseEnv($this->emails), -1, PREG_SPLIT_NO_EMPTY) as $email) {
+                    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $this->addError($attribute, "“{$email}” isn’t an email address.");
+                    }
+                }
+            }],
+            [['chatWebhook', 'webhookUrl'], function($attribute) {
+                $url = (string)App::parseEnv($this->$attribute);
+                if ($url !== '' && !preg_match('#^https?://#i', $url)) {
+                    $this->addError($attribute, 'Enter a URL starting with https://.');
+                }
+            }],
+            [['keepDays'], 'integer', 'min' => 1],
+            [['remindHours', 'stuckMinutes'], 'integer', 'min' => 0],
+        ];
+    }
+}

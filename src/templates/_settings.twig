@@ -1,0 +1,82 @@
+{% import '_includes/forms' as forms %}
+{% set configWarning = 'This is being overridden by `{setting}` in `config/cron-guard.php`.' %}
+{% macro warn(name, overrides, configWarning) %}{{ name in overrides ? configWarning|t('cron-guard', { setting: name }) : null }}{% endmacro %}
+{% import _self as m %}
+
+<h2>{{ 'Where alerts go'|t('cron-guard') }}</h2>
+
+{{ forms.textareaField({
+	label: 'Email'|t('cron-guard'),
+	instructions: 'Addresses to email, one a line. Sent with Craft’s email settings.'|t('cron-guard'),
+	id: 'emails',
+	name: 'emails',
+	value: settings.emails,
+	rows: 2,
+	errors: settings.getErrors('emails'),
+	warning: m.warn('emails', overrides, configWarning),
+	disabled: 'emails' in overrides,
+}) }}
+
+{{ forms.autosuggestField({
+	label: 'Slack, Discord or Teams'|t('cron-guard'),
+	instructions: 'An incoming webhook URL for the channel alerts should go to.'|t('cron-guard'),
+	id: 'chatWebhook',
+	name: 'chatWebhook',
+	value: settings.chatWebhook,
+	suggestEnvVars: true,
+	placeholder: 'https://hooks.slack.com/services/…',
+	errors: settings.getErrors('chatWebhook'),
+	warning: m.warn('chatWebhook', overrides, configWarning),
+	disabled: 'chatWebhook' in overrides,
+}) }}
+
+{{ forms.autosuggestField({
+	label: 'Webhook'|t('cron-guard'),
+	instructions: 'Alerts are posted here as JSON too.'|t('cron-guard'),
+	id: 'webhookUrl',
+	name: 'webhookUrl',
+	value: settings.webhookUrl,
+	suggestEnvVars: true,
+	errors: settings.getErrors('webhookUrl'),
+	warning: m.warn('webhookUrl', overrides, configWarning),
+	disabled: 'webhookUrl' in overrides,
+}) }}
+
+<div class="field">
+	<button type="button" class="btn formsubmit" data-action="cron-guard/commands/test-alert">{{ 'Send a test alert'|t('cron-guard') }}</button>
+	<p class="light smalltext">{{ 'Sends to what’s saved, so save changes first.'|t('cron-guard') }}</p>
+</div>
+
+<hr>
+
+<h2>{{ 'Health URL'|t('cron-guard') }}</h2>
+
+{{ forms.autosuggestField({
+	label: 'Token'|t('cron-guard'),
+	instructions: 'Set one to turn on a URL your uptime monitor can check. It answers 200 while every command is fine and 503 when one isn’t, and runs the check, so alerts still go out on a site nobody visits.'|t('cron-guard'),
+	id: 'healthToken',
+	name: 'healthToken',
+	value: settings.healthToken,
+	suggestEnvVars: true,
+	placeholder: '$CRON_GUARD_TOKEN',
+	errors: settings.getErrors('healthToken'),
+	warning: m.warn('healthToken', overrides, configWarning),
+	disabled: 'healthToken' in overrides,
+}) }}
+{% if settings.healthToken %}
+	<p class="light smalltext"><code>{{ healthUrl }}{{ '?' in healthUrl ? '&' : '?' }}cronGuardToken=…</code></p>
+{% endif %}
+
+<hr>
+
+{{ forms.textareaField({
+	label: 'Don’t watch'|t('cron-guard'),
+	instructions: 'Commands to leave out, one a line, with `*` for any part. Deploy and setup commands are left out to begin with.'|t('cron-guard'),
+	id: 'ignore',
+	name: 'ignore',
+	value: settings.ignore|join("\n"),
+	rows: 14,
+	code: true,
+	warning: m.warn('ignore', overrides, configWarning),
+	disabled: 'ignore' in overrides,
+}) }}

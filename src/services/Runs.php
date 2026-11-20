@@ -1,0 +1,213 @@
+<?php
+/**
+ * Cron Guard plugin for Craft CMS
+ *
+ * @link      https://suprim.com.au
+ * @author suprim <support@suprim.com.au> <https://suprim.com.au>
+ * @copyright Copyright (c) 2026 suprim
+ */
+
+namespace suprim\cronguard\services;
+
+use Craft;
+use craft\db\Query;
+use craft\helpers\Db;
+use craft\helpers\StringHelper;
+use DateTime;
+use suprim\cronguard\Plugin;
+use Throwable;
+use yii\base\ActionEvent;
+use yii\base\Component;
+
+/**
+ * Records each console command as it runs: when it started, how long it took, and how it ended.
+ */
+class Runs extends Component
+{
+    public const TABLE_COMMANDS = '{{%cronguard_commands}}';
+    public const TABLE_RUNS = '{{%cronguard_runs}}';
+
+    /** Options that don’t change what a command does, left out of its name. */
+    private const NOISE_OPTIONS = '/^--?(interactive|color|verbose|silent-exit-on-exception|v)(=|$)/';
+
+    /** @var array{runId: int, commandId: int, started: float}|null The run being recorded. */
+    private ?array $current = null;
+
+    private ?int $exitCode = null;
+
+    /** Whether this request’s command has been looked at, so commands it runs inside it aren’t recorded again. */
+    private bool $started = false;
+
+    /**
+     * Starts recording the command the console is about to run. Commands run inside it (`up` runs migrations) are
+     * part of the same run.
+     */
+    public function start(ActionEvent $event): void
+    {
+        if ($this->started) {
+            return;
+        }
+        $this->started = true;
+        // As it’s typed: `gc`, not `gc/run`, when the action is the command’s default one.
+        $controller = $event->action->controller;
+        $route = $event->action->id === $controller->defaultAction ? $controller->getUniqueId() : $event->action->getUniqueId();
+        $settings = Plugin::getInstance()->getSettings();
+        if ($this->isIgnored($route, $settings->ignore)) {
+            return;
+        }
+        if (!$settings->watchInteractive && $this->isInteractive()) {
+            return;
+        }
+        $command = $this->commandName($route, Craft::$app->getRequest()->getParams());
+
+        try {
+            $commandId = $this->commandId($command, $route);
+            Db::insert(self::TABLE_RUNS, [
+                'commandId' => $commandId,
+                'startedAt' => Db::prepareDateForDb(new DateTime()),
+            ]);
+            $this->current = [
+                'runId' => (int)Craft::$app->getDb()->getLastInsertID(),
+                'commandId' => $commandId,
+                'started' => microtime(true),
+            ];
+        } catch (Throwable $e) {
+            // Never stop the command because the database couldn’t be written: before install, or mid-migration.
+            Craft::warning('Cron Guard couldn’t record a run: ' . $e->getMessage(), 'cron-guard');
+            return;
+        }
+
+        // Runs after Craft’s own fatal error handling, which waits for these, so a crash is recorded too.
+        register_shutdown_function(fn() => $this->finish());
+    }
+
+    /**
+     * The exit code the console returned, when it returned one.
+     */
+    public function setExitCode(int $exitCode): void
+    {
+        $this->exitCode = $exitCode;
+    }
+
+    /**
+     * Records how the run ended, then checks it straight away so a failure is sent at once.
+     */
+    public function finish(): void
+    {
+        if ($this->current === null) {
+            return;
+        }
+        $current = $this->current;
+        $this->current = null;
+
+        $exitCode = $this->exitCode;
+        $error = null;
+        $exception = Craft::$app->getErrorHandler()->exception;
+        if ($exception !== null) {
+            $exitCode = 1;
+            $error = $exception->getMessage() ?: get_class($exception);
+        } elseif ($exitCode === null) {
+            // exit() called in the command itself: it finished, and how isn’t known.
+            $last = error_get_last();
+            if ($last !== null && in_array($last['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+                $exitCode = 255;
+                $error = $last['message'];
+            } else {
+                $exitCode = 0;
+            }
+        }
+
+        try {
+            Db::update(self::TABLE_RUNS, [
+                'finishedAt' => Db::prepareDateForDb(new DateTime()),
+                'durationMs' => (int)round((microtime(true) - $current['started']) * 1000),
+                'exitCode' => $exitCode,
+                'error' => $error !== null ? StringHelper::safeTruncate($error, 2000) : null,
+                'memory' => memory_get_peak_usage(true),
+            ], ['id' => $current['runId']]);
+            Plugin::getInstance()->checker->afterRun($current['commandId']);
+        } catch (Throwable $e) {
+            Craft::warning('Cron Guard couldn’t finish recording a run: ' . $e->getMessage(), 'cron-guard');
+        }
+    }
+
+    /**
+     * The command and the arguments that make it a different job (`resave/entries --section=news`).
+     *
+     * @param array<int|string, mixed> $params The console request’s params: the route, then its arguments.
+     */
+    public function commandName(string $route, array $params): string
+    {
+        $args = [];
+        foreach (array_slice(array_values($params), 1) as $param) {
+            if (!is_scalar($param) || preg_match(self::NOISE_OPTIONS, (string)$param)) {
+                continue;
+            }
+            $args[] = (string)$param;
+        }
+        $name = trim($route . ' ' . implode(' ', $args));
+        if (mb_strlen($name) > 255) {
+            $name = mb_substr($name, 0, 240) . ' …' . substr(md5($name), 0, 8);
+        }
+
+        return $name;
+    }
+
+    /**
+     * @param string[] $patterns
+     */
+    public function isIgnored(string $route, array $patterns): bool
+    {
+        foreach ($patterns as $pattern) {
+            $pattern = trim($pattern);
+            if ($pattern !== '' && fnmatch($pattern, $route)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Cron runs commands without a terminal; someone typing one has one.
+     */
+    private function isInteractive(): bool
+    {
+        return defined('STDIN') && function_exists('stream_isatty') && @stream_isatty(STDIN);
+    }
+
+    private function commandId(string $command, string $route): int
+    {
+        $id = (new Query())->select('id')->from(self::TABLE_COMMANDS)->where(['command' => $command])->scalar();
+        if ($id) {
+            return (int)$id;
+        }
+        Db::insert(self::TABLE_COMMANDS, ['command' => $command, 'route' => $route]);
+
+        return (int)Craft::$app->getDb()->getLastInsertID();
+    }
+
+    /**
+     * Removes runs older than `keepDays`, keeps at most 1,000 a command, and forgets commands left with none.
+     */
+    public function prune(): void
+    {
+        $settings = Plugin::getInstance()->getSettings();
+        Db::delete(self::TABLE_RUNS, ['<', 'startedAt', Db::prepareDateForDb(new DateTime("-{$settings->keepDays} days"))]);
+
+        foreach ((new Query())->select('id')->from(self::TABLE_COMMANDS)->column() as $commandId) {
+            $cutoff = (new Query())->select('id')->from(self::TABLE_RUNS)->where(['commandId' => $commandId])
+                ->orderBy(['id' => SORT_DESC])->offset(1000)->limit(1)->scalar();
+            if ($cutoff) {
+                Db::delete(self::TABLE_RUNS, ['and', ['commandId' => $commandId], ['<=', 'id', $cutoff]]);
+            }
+        }
+
+        $empty = (new Query())->select('c.id')->from(['c' => self::TABLE_COMMANDS])
+            ->leftJoin(['r' => self::TABLE_RUNS], '[[r.commandId]] = [[c.id]]')
+            ->where(['r.id' => null, 'c.muted' => false])->column();
+        if ($empty) {
+            Db::delete(self::TABLE_COMMANDS, ['id' => $empty]);
+        }
+    }
+}

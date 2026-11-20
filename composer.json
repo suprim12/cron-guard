@@ -1,0 +1,59 @@
+{
+  "name": "suprim/cron-guard",
+  "description": "Tells you when a Craft CMS site’s scheduled commands stop running, fail, get stuck or run slow. Nothing to set up: it learns each command’s schedule by itself.",
+  "type": "craft-plugin",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "suprim",
+      "homepage": "https://suprim.com.au"
+    }
+  ],
+  "support": {
+    "email": "support@suprim.com.au",
+    "issues": "https://github.com/suprim12/cron-guard/issues?state=open",
+    "source": "https://github.com/suprim12/cron-guard",
+    "docs": "https://github.com/suprim12/cron-guard#readme",
+    "rss": "https://github.com/suprim12/cron-guard/releases.atom"
+  },
+  "require": {
+    "php": ">=8.2",
+    "craftcms/cms": "^5.6.0"
+  },
+  "require-dev": {
+    "craftcms/ecs": "dev-main",
+    "craftcms/phpstan": "dev-main",
+    "phpstan/phpstan": "^2.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "suprim\\cronguard\\": "src/"
+    }
+  },
+  "extra": {
+    "handle": "cron-guard",
+    "name": "Cron Guard",
+    "developer": "suprim",
+    "class": "suprim\\cronguard\\Plugin",
+    "developerUrl": "https://suprim.com.au",
+    "developerEmail": "support@suprim.com.au",
+    "documentationUrl": "https://github.com/suprim12/cron-guard#readme",
+    "changelogUrl": "https://raw.githubusercontent.com/suprim12/cron-guard/main/CHANGELOG.md"
+  },
+  "scripts": {
+    "check-cs": "ecs check --ansi",
+    "fix-cs": "ecs check --ansi --fix",
+    "phpstan": "phpstan --memory-limit=1G"
+  },
+  "config": {
+    "sort-packages": true,
+    "platform": {
+      "php": "8.2"
+    },
+    "allow-plugins": {
+      "yiisoft/yii2-composer": true,
+      "craftcms/plugin-installer": true
+    }
+  },
+  "keywords": ["craft", "cms", "craftcms", "craft-plugin", "cron", "crontab", "scheduled tasks", "monitoring", "alerts", "health check"]
+}

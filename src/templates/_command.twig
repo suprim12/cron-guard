@@ -1,0 +1,65 @@
+<div class="cron-guard">
+	<p><a href="{{ cpUrl('utilities/cron-guard') }}">← {{ 'All commands'|t('cron-guard') }}</a></p>
+	<h2><code>{{ status.command }}</code></h2>
+	<p>
+		{% if status.message %}<strong>{{ status.message|ucfirst }}.</strong>{% endif %}
+		{% if status.interval %}
+			{{ 'Runs {every}.'|t('cron-guard', { every: checker.every(status.interval) }) }}
+		{% endif %}
+		{% if status.usualDuration is not null %}
+			{{ 'Usually takes {time}.'|t('cron-guard', { time: checker.duration(status.usualDuration) }) }}
+		{% endif %}
+	</p>
+
+	<div class="flex" style="margin-bottom: 1.5rem;">
+		<form method="post">
+			{{ csrfInput() }}{{ actionInput('cron-guard/commands/mute') }}{{ redirectInput('utilities/cron-guard?command=' ~ status.id) }}
+			{{ hiddenInput('id', status.id) }}{{ hiddenInput('muted', status.muted ? 0 : 1) }}
+			<button type="submit" class="btn">{{ status.muted ? 'Watch again'|t('cron-guard') : 'Mute'|t('cron-guard') }}</button>
+		</form>
+		<form method="post" onsubmit="return confirm({{ 'Forget this command and its runs? It comes back the next time it runs.'|t('cron-guard')|json_encode }})">
+			{{ csrfInput() }}{{ actionInput('cron-guard/commands/forget') }}
+			{{ hiddenInput('id', status.id) }}
+			<button type="submit" class="btn">{{ 'Forget'|t('cron-guard') }}</button>
+		</form>
+	</div>
+
+	<div class="tablepane">
+		<table class="data fullwidth cron-guard-runs">
+			<thead>
+				<tr>
+					<th scope="col">{{ 'Started'|t('cron-guard') }}</th>
+					<th scope="col">{{ 'Took'|t('cron-guard') }}</th>
+					<th scope="col">{{ 'Result'|t('cron-guard') }}</th>
+					<th scope="col">{{ 'Memory'|t('cron-guard') }}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{% for run in runs %}
+					<tr>
+						<td>{{ run.started|datetime('short') }}</td>
+						<td>{{ run.durationMs is not null ? checker.duration(run.durationMs / 1000) : '' }}</td>
+						<td>
+							{% if run.exitCode is null %}
+								<span class="cron-guard-state"><span class="status orange" aria-hidden="true"></span>{{ loop.first ? 'Running, or stopped before it finished'|t('cron-guard') : 'Didn’t finish'|t('cron-guard') }}</span>
+							{% elseif run.exitCode == 0 %}
+								<span class="cron-guard-state"><span class="status green" aria-hidden="true"></span>{{ 'OK'|t('cron-guard') }}</span>
+							{% else %}
+								<span class="cron-guard-state"><span class="status red" aria-hidden="true"></span>{{ 'Failed (exit code {code})'|t('cron-guard', { code: run.exitCode }) }}</span>
+								{% if run.error %}<div class="smalltext cron-guard-error">{{ run.error }}</div>{% endif %}
+							{% endif %}
+						</td>
+						<td>{{ run.memory ? (run.memory / 1048576)|round ~ ' MB' : '' }}</td>
+					</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</div>
+</div>
+
+{% css %}
+.cron-guard-state { white-space: nowrap; }
+.cron-guard-state .status { margin-inline-end: 6px; }
+.cron-guard-runs td, .cron-guard-runs th { vertical-align: top; }
+.cron-guard-error { white-space: pre-wrap; word-break: break-word; max-width: 60ch; }
+{% endcss %}
