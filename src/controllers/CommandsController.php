@@ -37,7 +37,11 @@ class CommandsController extends Controller
         $checker = Plugin::getInstance()->checker;
         $checker->resetDue();
         $alert = $checker->check();
-        $this->setSuccessFlash($alert ? Craft::t('cron-guard', 'Checked, and sent an alert.') : Craft::t('cron-guard', 'Checked: nothing new to send.'));
+        if ($alert === false) {
+            $this->setFailFlash(Craft::t('cron-guard', 'Another check is running. Try again in a moment.'));
+        } else {
+            $this->setSuccessFlash($alert ? Craft::t('cron-guard', 'Checked, and sent an alert.') : Craft::t('cron-guard', 'Checked: nothing new to send.'));
+        }
 
         return $this->redirectToPostedUrl();
     }

@@ -63,6 +63,15 @@ class RecordingTest extends TestCase
         $this->assertMatchesRegularExpression('/category ?group/i', (string)$run['error']);
     }
 
+    public function testExitCodeFromEnd(): void
+    {
+        // A command ending with Craft::$app->end(4).
+        $name = 'exec Craft::$app->end(4);';
+        $this->names[] = $name;
+        $this->assertSame(4, $this->craft("exec 'Craft::\$app->end(4);'"));
+        $this->assertSame(4, (int)$this->lastRun($name)['exitCode']);
+    }
+
     public function testDefaultActionsAreNamedAsTyped(): void
     {
         $this->names[] = 'graphql/print-schema';

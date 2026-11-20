@@ -60,13 +60,17 @@ class Plugin extends BasePlugin
         $app = Craft::$app;
         if ($app instanceof ConsoleApplication) {
             $app->on(Application::EVENT_BEFORE_ACTION, fn(ActionEvent $event) => $this->runs->start($event));
-            $app->on(Application::EVENT_AFTER_REQUEST, fn() => $this->runs->setExitCode((int)$app->getResponse()->exitStatus));
+            $app->on(Application::EVENT_AFTER_REQUEST, fn() => $this->runs->afterRequest());
         } elseif ($this->getSettings()->checkFromWeb) {
-            // Catches cron stopping altogether, when no command is left to notice it. After the page has gone out, so
-            // the visitor never waits for an alert to send.
+            // Catches cron stopping altogether, when no command is left to notice it. After the page has gone out and
+            // the connection is closed, so the visitor never waits for an alert to send.
             $app->on(Application::EVENT_AFTER_REQUEST, function() use ($app) {
                 if ($app->getIsInstalled() && !$app->getRequest()->getIsActionRequest()) {
-                    $app->getResponse()->on(Response::EVENT_AFTER_SEND, fn() => $this->checker->checkIfDue());
+                    $app->getResponse()->on(Response::EVENT_AFTER_SEND, fn() => $this->checker->checkIfDue(function() {
+                        if (function_exists('fastcgi_finish_request')) {
+                            fastcgi_finish_request();
+                        }
+                    }));
                 }
             });
         }

@@ -30,6 +30,11 @@ class CheckController extends Controller
         $checker = Plugin::getInstance()->checker;
         $checker->resetDue();
         $alert = $checker->check();
+        if ($alert === false) {
+            $this->stderr("Another check is running. Try again in a moment.\n", Console::FG_RED);
+
+            return ExitCode::TEMPFAIL;
+        }
         $this->stdout($alert
             ? sprintf("Sent an alert: %d problem(s), %d back to normal.\n", count($alert['problems']), count($alert['recovered']))
             : "Checked: nothing new to send.\n");

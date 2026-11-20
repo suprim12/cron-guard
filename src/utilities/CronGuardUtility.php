@@ -75,7 +75,7 @@ class CronGuardUtility extends Utility
                 unset($run);
 
                 return Craft::$app->getView()->renderTemplate('cron-guard/_command', [
-                    'status' => $checker->status($command, $checker->recentRuns($id), time()),
+                    'status' => $checker->status($command, array_slice($runs, 0, Checker::RUNS_LOOKED_AT), time()),
                     'runs' => $runs,
                     'checker' => $checker,
                 ]);

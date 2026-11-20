@@ -42,6 +42,9 @@
 						<td>
 							{% if run.exitCode is null %}
 								<span class="cron-guard-state"><span class="status orange" aria-hidden="true"></span>{{ loop.first ? 'Running, or stopped before it finished'|t('cron-guard') : 'Didn’t finish'|t('cron-guard') }}</span>
+							{% elseif run.exitCode == -1 %}
+								<span class="cron-guard-state"><span class="status red" aria-hidden="true"></span>{{ 'Stopped before it finished'|t('cron-guard') }}</span>
+								<div class="smalltext light">{{ 'Killed for using too much memory or time, or the server restarted.'|t('cron-guard') }}</div>
 							{% elseif run.exitCode == 0 %}
 								<span class="cron-guard-state"><span class="status green" aria-hidden="true"></span>{{ 'OK'|t('cron-guard') }}</span>
 							{% else %}

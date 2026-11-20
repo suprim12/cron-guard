@@ -8,6 +8,10 @@
 
 Problems found in the same check go out together as one alert. A **muted** command never sends one.
 
+A command that fails again within an hour of being reported fixed is **flapping**, such as a queue that fails every other run. It isn't sent again until its reminder is due, and nor is its next fix, so a busy command can't flood your inbox.
+
+If an alert couldn't be delivered to any channel, for example because the mail server or webhook was down, it isn't marked as sent and goes out with the next check.
+
 ## Email
 
 Sent with Craft's email settings to every address under **Email**. The subject says what happened, such as `db/backup hasn't run on Green Grocer`, and the body lists each problem with a link to **Utilities → Cron Guard**:

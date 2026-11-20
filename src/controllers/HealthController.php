@@ -30,7 +30,8 @@ class HealthController extends Controller
     public function actionIndex(): Response
     {
         $token = (string)App::parseEnv(Plugin::getInstance()->getSettings()->healthToken);
-        $given = (string)($this->request->getQueryParam('cronGuardToken') ?? $this->request->getHeaders()->get('X-Cron-Guard-Token', ''));
+        $given = $this->request->getQueryParam('cronGuardToken') ?? $this->request->getHeaders()->get('X-Cron-Guard-Token', '');
+        $given = is_string($given) ? $given : '';
         if ($token === '' || !hash_equals($token, $given)) {
             throw new NotFoundHttpException();
         }

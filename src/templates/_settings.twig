@@ -53,7 +53,7 @@
 
 {{ forms.autosuggestField({
 	label: 'Token'|t('cron-guard'),
-	instructions: 'Set one to turn on a URL your uptime monitor can check. It answers 200 while every command is fine and 503 when one isn’t, and runs the check, so alerts still go out on a site nobody visits.'|t('cron-guard'),
+	instructions: 'Set one to turn on a URL your uptime monitor can check. It answers 200 while every command is fine and 503 when one isn’t, and runs the check, so alerts still go out on a site nobody visits. Use an environment variable, so the token isn’t saved in project config.'|t('cron-guard'),
 	id: 'healthToken',
 	name: 'healthToken',
 	value: settings.healthToken,

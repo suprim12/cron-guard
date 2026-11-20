@@ -17,6 +17,7 @@ use DateTime;
 use suprim\cronguard\Plugin;
 use Throwable;
 use yii\base\Component;
+use yii\db\Expression;
 
 /**
  * Works out each command’s schedule from its runs, finds what’s wrong, and sends alerts once per problem.
@@ -39,7 +40,10 @@ class Checker extends Component
     public const RUNS_TO_LEARN = 4;
 
     /** Runs looked at to learn a schedule and a usual duration. */
-    private const RUNS_LOOKED_AT = 21;
+    public const RUNS_LOOKED_AT = 21;
+
+    /** Seconds after a command was reported fixed in which it failing again counts as flapping, and isn’t sent. */
+    private const FLAP_SECONDS = 3600;
 
     /** Seconds between checks started by visits and other commands. */
     private const CHECK_EVERY = 300;
@@ -53,7 +57,8 @@ class Checker extends Component
     {
         $now ??= time();
         $commands = (new Query())->from(Runs::TABLE_COMMANDS)->orderBy(['command' => SORT_ASC])->all();
-        $statuses = array_map(fn($command) => $this->status($command, $this->recentRuns((int)$command['id']), $now), $commands);
+        $runs = $this->recentRunsByCommand();
+        $statuses = array_map(fn($command) => $this->status($command, $runs[(int)$command['id']] ?? [], $now), $commands);
         usort($statuses, fn($a, $b) => [$this->rank($a['state']), $a['command']] <=> [$this->rank($b['state']), $b['command']]);
 
         return $statuses;
@@ -82,8 +87,11 @@ class Checker extends Component
 
         $interval = $this->configuredInterval($command, $settings->schedules);
         $learnt = $interval === null;
-        if ($interval === null) {
-            $interval = $this->learntInterval($starts);
+        // How long it may go between runs: its interval, or the longest of its usual gaps when its schedule has some
+        // (weekdays only: three days over a weekend).
+        $longestGap = $interval;
+        if ($interval === null && ($schedule = $this->learntSchedule($starts))) {
+            [$interval, $longestGap] = $schedule;
         }
         // The usual duration leaves out the newest run, so a slow one is compared with the ones before it.
         $usualDuration = $this->median(array_slice($durations, $lastFinished === $last ? 1 : 0));
@@ -114,10 +122,13 @@ class Checker extends Component
         if ($running && $settings->stuckMinutes > 0 && $now - $status['lastStart'] > $stuckAfter) {
             $state = self::STUCK;
             $message = sprintf('started %s ago and hasn’t finished: it’s stuck, or was stopped before it could (out of memory, a time limit or a restart)', $this->duration($now - $status['lastStart']));
+        } elseif ($lastFinished !== null && (int)$lastFinished['exitCode'] === Runs::EXIT_ABANDONED) {
+            $state = self::FAILING;
+            $message = 'stopped before it finished: killed for using too much memory or time, or the server restarted';
         } elseif ($lastFinished !== null && (int)$lastFinished['exitCode'] !== 0) {
             $state = self::FAILING;
             $message = sprintf('failed with exit code %d%s', $lastFinished['exitCode'], $lastFinished['error'] ? ': ' . $lastFinished['error'] : '');
-        } elseif ($interval !== null && $status['lastStart'] !== null && $now - $status['lastStart'] > $interval + $this->grace($interval)) {
+        } elseif (!$running && $interval !== null && $status['lastStart'] !== null && $now - $status['lastStart'] > $longestGap + $this->grace($interval)) {
             $state = self::OVERDUE;
             $message = sprintf('hasn’t run for %s; it usually runs %s', $this->duration($now - $status['lastStart']), $this->every($interval));
         } elseif (!$running && $lastFinished !== null && $usualDuration !== null && count($durations) > self::RUNS_TO_LEARN
@@ -139,61 +150,87 @@ class Checker extends Component
 
     /**
      * Checks every command and sends what’s new: problems that started, ones still there after `remindHours`, and
-     * ones that went away. Returns the alert sent, if any.
+     * ones that went away. Returns the alert sent, null when there was nothing to send, or false when another check
+     * was already running.
+     *
+     * A command that fails again within an hour of being reported fixed is flapping: it isn’t sent again until its
+     * reminder is due, and nor is its next recovery. What wasn’t delivered anywhere is tried again next time.
      *
      * @param int[]|null $commandIds Only these commands.
-     * @return array{problems: array<int, array<string, mixed>>, recovered: array<int, array<string, mixed>>, stopped: bool}|null
+     * @return array{problems: array<int, array<string, mixed>>, recovered: array<int, array<string, mixed>>, stopped: bool}|false|null
      */
-    public function check(?array $commandIds = null, ?int $now = null): ?array
+    public function check(?array $commandIds = null, ?int $now = null): array|false|null
     {
         $now ??= time();
         $mutex = Craft::$app->getMutex();
         $lock = 'cron-guard:check';
         if (!$mutex->acquire($lock, 5)) {
-            return null;
+            return false;
         }
 
         try {
             $settings = Plugin::getInstance()->getSettings();
+            $this->closeAbandoned($now);
             $statuses = $this->statuses($now);
             $problems = [];
             $recovered = [];
+            // What to remember for each command: [alertState, alertedAt], and whether it waits on the alert going out.
+            $changes = [];
             foreach ($statuses as $status) {
                 if ($commandIds !== null && !in_array($status['id'], $commandIds, true)) {
                     continue;
                 }
-                $isProblem = in_array($status['state'], self::PROBLEMS, true);
                 $was = $status['alertState'];
-                if ($isProblem) {
-                    $remind = $settings->remindHours > 0 && $status['alertedAt'] !== null
-                        && $now - $this->timestamp($status['alertedAt']) > $settings->remindHours * 3600;
-                    if ($was !== $status['state'] || $remind) {
-                        $status['reminder'] = $was === $status['state'];
+                $wasState = $was !== null ? explode(':', $was)[0] : null;
+                $quiet = $was !== null && str_ends_with($was, ':quiet');
+                $lastAlert = $status['alertedAt'] !== null ? $this->timestamp($status['alertedAt']) : null;
+
+                if (in_array($status['state'], self::PROBLEMS, true)) {
+                    if ($wasState === $status['state']) {
+                        if ($settings->remindHours > 0 && $lastAlert !== null && $now - $lastAlert > $settings->remindHours * 3600) {
+                            $status['reminder'] = true;
+                            $problems[] = $status;
+                            $changes[$status['id']] = [$status['state'], $now, true];
+                        }
+                    } elseif ($was === null && $lastAlert !== null && $now - $lastAlert < self::FLAP_SECONDS) {
+                        $changes[$status['id']] = [$status['state'] . ':quiet', $lastAlert, false];
+                    } else {
+                        $status['reminder'] = false;
                         $problems[] = $status;
-                        $this->remember($status['id'], $status['state'], $now);
+                        $changes[$status['id']] = [$status['state'], $now, true];
                     }
                 } elseif ($was !== null && $status['state'] !== self::MUTED) {
                     // A slow run isn’t something to recover from: the next normal one just clears it.
-                    if ($was !== self::SLOW) {
+                    if (!$quiet && $wasState !== self::SLOW) {
                         $recovered[] = $status;
+                        $changes[$status['id']] = [null, $now, true];
+                    } else {
+                        $changes[$status['id']] = [null, $lastAlert, false];
                     }
-                    $this->remember($status['id'], null, $now);
                 }
             }
 
-            if (!$problems && !$recovered) {
-                return null;
+            $alert = null;
+            $delivered = true;
+            if ($problems || $recovered) {
+                // When everything with a schedule is overdue, cron itself has most likely stopped.
+                $scheduled = array_filter($statuses, fn($s) => $s['interval'] !== null && $s['state'] !== self::MUTED);
+                $overdue = array_filter($scheduled, fn($s) => $s['state'] === self::OVERDUE);
+                $alert = [
+                    'problems' => $problems,
+                    'recovered' => $recovered,
+                    'stopped' => count($scheduled) > 1 && count($overdue) === count($scheduled),
+                ];
+                $results = Plugin::getInstance()->alerts->send($alert);
+                // No channels means it went to the log; otherwise one channel taking it is enough.
+                $delivered = !$results || in_array(true, $results, true);
             }
 
-            // When everything with a schedule is overdue, cron itself has most likely stopped.
-            $scheduled = array_filter($statuses, fn($s) => $s['interval'] !== null && $s['state'] !== self::MUTED);
-            $overdue = array_filter($scheduled, fn($s) => $s['state'] === self::OVERDUE);
-            $alert = [
-                'problems' => $problems,
-                'recovered' => $recovered,
-                'stopped' => count($scheduled) > 1 && count($overdue) === count($scheduled),
-            ];
-            Plugin::getInstance()->alerts->send($alert);
+            foreach ($changes as $id => [$state, $at, $needsDelivery]) {
+                if ($delivered || !$needsDelivery) {
+                    $this->remember($id, $state, $at);
+                }
+            }
 
             return $alert;
         } finally {
@@ -202,22 +239,55 @@ class Checker extends Component
     }
 
     /**
+     * Closes runs that were killed before they could finish (out of memory, a time limit, a restart), once a newer run
+     * of the same command has started and they’ve been open five times their usual time, and at least ten minutes.
+     * They count as failed. The newest run is left open: it’s reported as stuck instead.
+     */
+    public function closeAbandoned(int $now): void
+    {
+        $open = (new Query())->select(['id', 'commandId', 'startedAt'])->from(Runs::TABLE_RUNS)->where(['exitCode' => null])->all();
+        foreach ($open as $run) {
+            $newer = (new Query())->from(Runs::TABLE_RUNS)
+                ->where(['commandId' => $run['commandId']])
+                ->andWhere(['>', 'id', $run['id']])
+                ->exists();
+            if (!$newer) {
+                continue;
+            }
+            $usual = (new Query())->from(Runs::TABLE_RUNS)
+                ->where(['commandId' => $run['commandId']])
+                ->andWhere(['not', ['durationMs' => null]])
+                ->orderBy(['id' => SORT_DESC])->limit(self::RUNS_LOOKED_AT)->column();
+            $usual = $usual ? $this->median(array_map('intval', $usual)) / 1000 : 0;
+            if ($now - $this->timestamp($run['startedAt']) > max(600, $usual * 5)) {
+                Db::update(Runs::TABLE_RUNS, [
+                    'exitCode' => Runs::EXIT_ABANDONED,
+                    'error' => 'Stopped before it finished.',
+                ], ['id' => $run['id']]);
+            }
+        }
+    }
+
+    /**
      * The check after a command finishes: that command at once, everything else every few minutes.
      */
     public function afterRun(int $commandId): void
     {
-        $this->check($this->isDue() ? null : [$commandId]);
+        $this->check($this->claimDue() ? null : [$commandId]);
     }
 
     /**
-     * The check from visits and the health URL, at most every few minutes.
+     * The check from visits and the health URL, at most every few minutes. `$before` runs first when it’s due.
      */
-    public function checkIfDue(): void
+    public function checkIfDue(?callable $before = null): void
     {
-        if (!$this->isDue()) {
-            return;
-        }
         try {
+            if (!$this->claimDue()) {
+                return;
+            }
+            if ($before !== null) {
+                $before();
+            }
             $this->check();
         } catch (Throwable $e) {
             Craft::warning('Cron Guard’s check failed: ' . $e->getMessage(), 'cron-guard');
@@ -227,7 +297,7 @@ class Checker extends Component
     /**
      * Whether it’s time for a full check, claiming it when it is. Old runs are pruned once an hour as well.
      */
-    private function isDue(): bool
+    private function claimDue(): bool
     {
         $cache = Craft::$app->getCache();
         if (!$cache->add('cron-guard:checked', time(), self::CHECK_EVERY)) {
@@ -256,6 +326,18 @@ class Checker extends Component
      */
     public function learntInterval(array $starts): ?int
     {
+        return $this->learntSchedule($starts)[0] ?? null;
+    }
+
+    /**
+     * The usual time between runs and the longest gap it usually has (the 85th percentile, so a weekend’s gap in a
+     * weekday schedule counts, and one past outage doesn’t), when its runs are regular.
+     *
+     * @param int[] $starts Newest first.
+     * @return array{0: int, 1: int}|null
+     */
+    public function learntSchedule(array $starts): ?array
+    {
         if (count($starts) < self::RUNS_TO_LEARN) {
             return null;
         }
@@ -268,8 +350,13 @@ class Checker extends Component
             return null;
         }
         $regular = count(array_filter($gaps, fn($gap) => $gap >= $usual * 0.5 && $gap <= $usual * 1.5));
+        if ($regular / count($gaps) < 0.8) {
+            return null;
+        }
+        sort($gaps);
+        $longest = $gaps[(int)ceil(count($gaps) * 0.85) - 1];
 
-        return $regular / count($gaps) >= 0.8 ? (int)round($usual) : null;
+        return [(int)round($usual), (int)max($usual, $longest)];
     }
 
     /**
@@ -299,6 +386,25 @@ class Checker extends Component
     }
 
     /**
+     * Every command’s latest runs, newest first, by command id, in one query.
+     *
+     * @return array<int, array<int, array<string, mixed>>>
+     */
+    public function recentRunsByCommand(): array
+    {
+        $ranked = (new Query())
+            ->select(['*', 'rn' => new Expression('ROW_NUMBER() OVER (PARTITION BY [[commandId]] ORDER BY [[startedAt]] DESC, [[id]] DESC)')])
+            ->from(Runs::TABLE_RUNS);
+        $byCommand = [];
+        foreach ((new Query())->from(['r' => $ranked])->where(['<=', 'rn', self::RUNS_LOOKED_AT])->orderBy(['commandId' => SORT_ASC, 'rn' => SORT_ASC])->all() as $run) {
+            unset($run['rn']);
+            $byCommand[(int)$run['commandId']][] = $run;
+        }
+
+        return $byCommand;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function recentRuns(int $commandId, int $limit = self::RUNS_LOOKED_AT): array
@@ -322,11 +428,11 @@ class Checker extends Component
         return null;
     }
 
-    private function remember(int $commandId, ?string $state, int $now): void
+    private function remember(int $commandId, ?string $state, ?int $at): void
     {
         Db::update(Runs::TABLE_COMMANDS, [
             'alertState' => $state,
-            'alertedAt' => $state !== null ? Db::prepareDateForDb(new DateTime("@$now")) : null,
+            'alertedAt' => $at !== null ? Db::prepareDateForDb(new DateTime("@$at")) : null,
         ], ['id' => $commandId]);
         Craft::$app->getCache()->delete('cron-guard:badge');
     }

@@ -48,7 +48,7 @@ class Alerts extends Component
         ]);
         $this->trigger(self::EVENT_BEFORE_SEND, $event);
         if ($event->handled) {
-            return [];
+            return ['Your event handler' => true];
         }
 
         $settings = Plugin::getInstance()->getSettings();
@@ -131,7 +131,7 @@ class Alerts extends Component
             if (!empty($problem['reminder'])) {
                 $line .= ' (still)';
             }
-            if ($problem['state'] !== Checker::OVERDUE && $problem['lastOk'] !== null) {
+            if ($problem['state'] !== Checker::OVERDUE && $problem['state'] !== Checker::SLOW && $problem['lastOk'] !== null) {
                 $line .= sprintf('. Last ran fine %s ago.', $checker->duration(time() - $checker->timestamp($problem['lastOk']['startedAt'])));
             } elseif ($problem['state'] !== Checker::OVERDUE && $problem['state'] !== Checker::SLOW) {
                 $line .= '.';
@@ -183,9 +183,13 @@ class Alerts extends Component
                         '$schema' => 'http://adaptivecards.io/schemas/adaptive-card.json',
                         'type' => 'AdaptiveCard',
                         'version' => '1.4',
+                        // A block a line: Teams joins lines within a block into one paragraph.
                         'body' => [
                             ['type' => 'TextBlock', 'text' => $event->subject, 'weight' => 'Bolder', 'wrap' => true],
-                            ['type' => 'TextBlock', 'text' => $event->text, 'wrap' => true],
+                            ...array_map(
+                                fn($line) => ['type' => 'TextBlock', 'text' => $line, 'wrap' => true, 'spacing' => 'Small'],
+                                array_values(array_filter(explode("\n", $event->text), fn($line) => trim($line) !== '')),
+                            ),
                         ],
                     ],
                 ]],

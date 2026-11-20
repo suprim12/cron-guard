@@ -17,7 +17,9 @@ use DateTime;
 use suprim\cronguard\Plugin;
 use Throwable;
 use yii\base\ActionEvent;
+use yii\base\Application;
 use yii\base\Component;
+use yii\db\IntegrityException;
 
 /**
  * Records each console command as it runs: when it started, how long it took, and how it ended.
@@ -26,6 +28,9 @@ class Runs extends Component
 {
     public const TABLE_COMMANDS = '{{%cronguard_commands}}';
     public const TABLE_RUNS = '{{%cronguard_runs}}';
+
+    /** The exit code of a run that never finished: the process was killed, or the server restarted. */
+    public const EXIT_ABANDONED = -1;
 
     /** Options that don’t change what a command does, left out of its name. */
     private const NOISE_OPTIONS = '/^--?(interactive|color|verbose|silent-exit-on-exception|v)(=|$)/';
@@ -52,7 +57,7 @@ class Runs extends Component
         $controller = $event->action->controller;
         $route = $event->action->id === $controller->defaultAction ? $controller->getUniqueId() : $event->action->getUniqueId();
         $settings = Plugin::getInstance()->getSettings();
-        if ($this->isIgnored($route, $settings->ignore)) {
+        if ($this->isIgnored([$route, $event->action->getUniqueId()], $settings->ignore)) {
             return;
         }
         if (!$settings->watchInteractive && $this->isInteractive()) {
@@ -82,11 +87,18 @@ class Runs extends Component
     }
 
     /**
-     * The exit code the console returned, when it returned one.
+     * Notes the exit code as the console request ends. `Craft::$app->end($status)`, and an `ExitException`, end the
+     * request before their status reaches the response, so it’s read from the call itself.
      */
-    public function setExitCode(int $exitCode): void
+    public function afterRequest(): void
     {
-        $this->exitCode = $exitCode;
+        foreach (debug_backtrace(0, 12) as $frame) {
+            if ($frame['function'] === 'end' && isset($frame['class']) && is_a($frame['class'], Application::class, true)) {
+                $this->exitCode = (int)($frame['args'][0] ?? 0);
+                return;
+            }
+        }
+        $this->exitCode = (int)Craft::$app->getResponse()->exitStatus;
     }
 
     /**
@@ -154,14 +166,20 @@ class Runs extends Component
     }
 
     /**
+     * Whether a route matches the ignore list, as typed (`migrate`) or in full (`migrate/up`). `migrate/*` also
+     * matches `migrate` on its own.
+     *
+     * @param string|string[] $routes
      * @param string[] $patterns
      */
-    public function isIgnored(string $route, array $patterns): bool
+    public function isIgnored(string|array $routes, array $patterns): bool
     {
-        foreach ($patterns as $pattern) {
-            $pattern = trim($pattern);
-            if ($pattern !== '' && fnmatch($pattern, $route)) {
-                return true;
+        foreach ((array)$routes as $route) {
+            foreach ($patterns as $pattern) {
+                $pattern = trim($pattern);
+                if ($pattern !== '' && (fnmatch($pattern, $route) || (str_ends_with($pattern, '/*') && substr($pattern, 0, -2) === $route))) {
+                    return true;
+                }
             }
         }
 
@@ -178,28 +196,49 @@ class Runs extends Component
 
     private function commandId(string $command, string $route): int
     {
-        $id = (new Query())->select('id')->from(self::TABLE_COMMANDS)->where(['command' => $command])->scalar();
-        if ($id) {
+        $find = fn() => (new Query())->select('id')->from(self::TABLE_COMMANDS)->where(['command' => $command])->scalar();
+        if ($id = $find()) {
             return (int)$id;
         }
-        Db::insert(self::TABLE_COMMANDS, ['command' => $command, 'route' => $route]);
+        try {
+            Db::insert(self::TABLE_COMMANDS, ['command' => $command, 'route' => $route]);
+        } catch (IntegrityException $e) {
+            // Its first run started on two servers at once, and the other one added it.
+            if ($id = $find()) {
+                return (int)$id;
+            }
+            throw $e;
+        }
 
         return (int)Craft::$app->getDb()->getLastInsertID();
     }
 
     /**
-     * Removes runs older than `keepDays`, keeps at most 1,000 a command, and forgets commands left with none.
+     * Removes runs older than `keepDays`, keeps at most 1,000 a command, and forgets commands left with none. A command
+     * with a schedule keeps its latest runs however old they are, so one that runs less often than `keepDays` isn’t
+     * forgotten before it’s missed.
      */
     public function prune(): void
     {
-        $settings = Plugin::getInstance()->getSettings();
-        Db::delete(self::TABLE_RUNS, ['<', 'startedAt', Db::prepareDateForDb(new DateTime("-{$settings->keepDays} days"))]);
+        $plugin = Plugin::getInstance();
+        $cutoff = Db::prepareDateForDb(new DateTime("-{$plugin->getSettings()->keepDays} days"));
+        $scheduled = array_column(array_filter($plugin->checker->statuses(), fn($s) => $s['interval'] !== null), 'id');
 
         foreach ((new Query())->select('id')->from(self::TABLE_COMMANDS)->column() as $commandId) {
-            $cutoff = (new Query())->select('id')->from(self::TABLE_RUNS)->where(['commandId' => $commandId])
-                ->orderBy(['id' => SORT_DESC])->offset(1000)->limit(1)->scalar();
-            if ($cutoff) {
-                Db::delete(self::TABLE_RUNS, ['and', ['commandId' => $commandId], ['<=', 'id', $cutoff]]);
+            $commandId = (int)$commandId;
+            $old = ['and', ['commandId' => $commandId], ['<', 'startedAt', $cutoff]];
+            if (in_array($commandId, $scheduled, true)) {
+                $oldestKept = $this->nthNewestRunId($commandId, Checker::RUNS_LOOKED_AT);
+                if ($oldestKept === null) {
+                    continue;
+                }
+                $old[] = ['<', 'id', $oldestKept];
+            }
+            Db::delete(self::TABLE_RUNS, $old);
+
+            $beyond = $this->nthNewestRunId($commandId, 1001);
+            if ($beyond !== null) {
+                Db::delete(self::TABLE_RUNS, ['and', ['commandId' => $commandId], ['<=', 'id', $beyond]]);
             }
         }
 
@@ -209,5 +248,16 @@ class Runs extends Component
         if ($empty) {
             Db::delete(self::TABLE_COMMANDS, ['id' => $empty]);
         }
+    }
+
+    /**
+     * The id of a command’s nth newest run, if it has that many.
+     */
+    private function nthNewestRunId(int $commandId, int $n): ?int
+    {
+        $id = (new Query())->select('id')->from(self::TABLE_RUNS)->where(['commandId' => $commandId])
+            ->orderBy(['id' => SORT_DESC])->offset($n - 1)->limit(1)->scalar();
+
+        return $id ? (int)$id : null;
     }
 }

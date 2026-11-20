@@ -81,9 +81,15 @@ class Settings extends Model
      */
     public function emailList(): array
     {
-        $emails = preg_split('/[\s,;]+/', (string)App::parseEnv($this->emails), -1, PREG_SPLIT_NO_EMPTY);
+        return array_values(array_filter($this->splitEmails(), fn($email) => filter_var($email, FILTER_VALIDATE_EMAIL)));
+    }
 
-        return array_values(array_filter($emails, fn($email) => filter_var($email, FILTER_VALIDATE_EMAIL)));
+    /**
+     * @return string[]
+     */
+    private function splitEmails(): array
+    {
+        return preg_split('/[\s,;]+/', (string)App::parseEnv($this->emails), -1, PREG_SPLIT_NO_EMPTY);
     }
 
     protected function defineRules(): array
@@ -91,7 +97,7 @@ class Settings extends Model
         return [
             [['emails', 'chatWebhook', 'webhookUrl', 'healthToken'], 'string'],
             [['emails'], function($attribute) {
-                foreach (preg_split('/[\s,;]+/', (string)App::parseEnv($this->emails), -1, PREG_SPLIT_NO_EMPTY) as $email) {
+                foreach ($this->splitEmails() as $email) {
                     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                         $this->addError($attribute, "“{$email}” isn’t an email address.");
                     }
