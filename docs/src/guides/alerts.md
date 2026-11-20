@@ -14,7 +14,7 @@ If an alert couldn't be delivered to any channel, for example because the mail s
 
 ## Email
 
-Sent with Craft's email settings to every address under **Email**. The subject says what happened, such as `db/backup hasn't run on Green Grocer`, and the body lists each problem with a link to **Utilities → Cron Guard**:
+Sent as HTML with a plain-text copy, with Craft's email settings, to every address under **Email**. You can use your own [email template](./email-templates), in Twig or MJML. The subject says what happened, such as `db/backup hasn't run on Green Grocer`, and the body lists each problem with a link to **Utilities → Cron Guard**:
 
 ```
 ✗ feed-me/feeds/queue --id=3 failed with exit code 1: cURL error 28: Operation timed out after 30001 milliseconds. Last ran fine 1 day ago.

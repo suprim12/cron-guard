@@ -12,6 +12,7 @@ namespace suprim\cronguard\services;
 use Craft;
 use craft\helpers\App;
 use craft\helpers\UrlHelper;
+use craft\web\View;
 use suprim\cronguard\events\AlertEvent;
 use suprim\cronguard\Plugin;
 use Throwable;
@@ -54,7 +55,7 @@ class Alerts extends Component
         $settings = Plugin::getInstance()->getSettings();
         $results = [];
         if ($emails = $settings->emailList()) {
-            $results['Email'] = $this->attempt(fn() => $this->email($emails, $event->subject, $event->text));
+            $results['Email'] = $this->attempt(fn() => $this->email($emails, $event));
         }
         if ($url = (string)App::parseEnv($settings->chatWebhook)) {
             $results['Chat'] = $this->attempt(fn() => $this->post($url, $this->chatPayload($url, $event)));
@@ -150,16 +151,95 @@ class Alerts extends Component
     /**
      * @param string[] $emails
      */
-    private function email(array $emails, string $subject, string $text): void
+    private function email(array $emails, AlertEvent $event): void
     {
         $sent = Craft::$app->getMailer()->compose()
             ->setTo($emails)
-            ->setSubject($subject)
-            ->setTextBody($text)
+            ->setSubject($event->subject)
+            ->setTextBody($event->text)
+            ->setHtmlBody($this->emailHtml($event))
             ->send();
         if (!$sent) {
             throw new \RuntimeException('Craft’s mailer didn’t send it; check Settings → Email.');
         }
+    }
+
+    /**
+     * The email’s HTML: the site’s own template when `emailTemplate` is set, or Cron Guard’s. A site template that
+     * fails falls back to Cron Guard’s, so the alert still goes out.
+     */
+    public function emailHtml(AlertEvent $event): string
+    {
+        $variables = $this->emailVariables($event);
+        $view = Craft::$app->getView();
+        $template = trim(Plugin::getInstance()->getSettings()->emailTemplate);
+        if ($template !== '') {
+            try {
+                $html = $view->renderTemplate($template, $variables, View::TEMPLATE_MODE_SITE);
+                if (str_ends_with(strtolower($template), '.mjml')) {
+                    $html = $this->compileMjml($html);
+                }
+
+                return $html;
+            } catch (Throwable $e) {
+                Craft::error("Cron Guard couldn’t use the email template “{$template}”, so sent its own: {$e->getMessage()}", 'cron-guard');
+            }
+        }
+
+        return $view->renderTemplate('cron-guard/_email', $variables, View::TEMPLATE_MODE_CP);
+    }
+
+    /**
+     * What email templates get: the alert, with each command’s status in words.
+     *
+     * @return array<string, mixed>
+     */
+    public function emailVariables(AlertEvent $event): array
+    {
+        $checker = Plugin::getInstance()->checker;
+        $item = fn(array $status) => [
+            'command' => $status['command'],
+            'state' => $status['state'],
+            'label' => match ($status['state']) {
+                Checker::FAILING => 'Failed',
+                Checker::STUCK => 'Stuck',
+                Checker::OVERDUE => 'Missed',
+                Checker::SLOW => 'Slow',
+                default => 'OK',
+            },
+            'message' => $status['message'],
+            'reminder' => !empty($status['reminder']),
+            'every' => $status['interval'] !== null ? $checker->every($status['interval']) : null,
+            'lastOkAgo' => !in_array($status['state'], [Checker::OVERDUE, Checker::SLOW], true) && !empty($status['lastOk'])
+                ? $checker->duration(time() - $checker->timestamp($status['lastOk']['startedAt']))
+                : null,
+        ];
+        $problems = array_map($item, $event->problems);
+
+        return [
+            'subject' => $event->subject,
+            'text' => $event->text,
+            'preview' => $event->test ? 'A test from Cron Guard.' : implode(' ', array_map(fn($p) => "{$p['command']} {$p['message']}.", $problems)),
+            'problems' => $problems,
+            'recovered' => array_map($item, $event->recovered),
+            'stopped' => $event->stopped,
+            'test' => $event->test,
+            'siteName' => $this->siteName(),
+            'url' => $this->link(),
+        ];
+    }
+
+    /**
+     * Turns MJML into HTML with spatie/mjml-php, which runs the mjml npm package with Node.
+     */
+    private function compileMjml(string $mjml): string
+    {
+        $class = 'Spatie\\Mjml\\Mjml';
+        if (!class_exists($class)) {
+            throw new \RuntimeException('A .mjml template needs spatie/mjml-php (composer require spatie/mjml-php, and npm install mjml). Or compile it to HTML and use that.');
+        }
+
+        return $class::new()->toHtml($mjml);
     }
 
     /**

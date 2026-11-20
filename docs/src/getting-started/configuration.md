@@ -22,6 +22,7 @@ return [
     'remindHours' => 24,
     'stuckMinutes' => 60,
     'checkFromWeb' => true,
+    'emailTemplate' => '',
 ];
 ```
 
@@ -40,6 +41,7 @@ return [
 | `remindHours` | `24` | Hours before a problem that's still there is sent again. `0` sends it once. |
 | `stuckMinutes` | `60` | Minutes a run may take before it counts as stuck, unless it usually takes longer. |
 | `checkFromWeb` | `true` | Run the check after control panel and site requests too, at most every five minutes. |
+| `emailTemplate` | | A site template for alert emails, in Twig or MJML. See [Email Templates](../guides/email-templates). |
 
 ## When to set a schedule yourself
 

@@ -1,0 +1,51 @@
+<mjml>
+  <mj-head>
+    <mj-title>{{ subject }}</mj-title>
+    <mj-preview>{{ preview }}</mj-preview>
+    <mj-attributes>
+      <mj-all font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" />
+      <mj-text font-size="15px" line-height="1.55" color="#1f2933" padding="0" />
+    </mj-attributes>
+    <mj-style>
+      .cg-code { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+      a { color: #0f766e; }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#eef2f1" width="600px">
+    <mj-section padding="28px 0 12px">
+      <mj-column>
+        <mj-text font-size="13px" font-weight="600" color="#0f766e" letter-spacing="0.04em">CRON GUARD · {{ siteName|upper }}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#ffffff" border-radius="12px" padding="28px 28px 8px">
+      <mj-column>
+        <mj-text font-size="20px" font-weight="700" line-height="1.3" padding="0 0 16px">{{ subject }}</mj-text>
+        <mj-raw>{% if test %}</mj-raw>
+        <mj-text padding="0 0 20px">This is a test. Alerts about scheduled commands will arrive here.</mj-text>
+        <mj-raw>{% endif %}</mj-raw>
+        <mj-raw>{% if stopped %}</mj-raw>
+        <mj-text padding="0 0 20px">None of the scheduled commands have run when they usually do, so cron itself has most likely stopped: check the server’s crontab, or the scheduler on your host.</mj-text>
+        <mj-raw>{% endif %}</mj-raw>
+        <mj-raw>{% for item in problems %}</mj-raw>
+        <mj-text padding="0 0 16px">
+          <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;color:#ffffff;background:{{ item.state == 'slow' ? '#d97706' : '#dc2626' }};">{{ item.label }}{{ item.reminder ? ' · still' : '' }}</span><br>
+          <span class="cg-code">{{ item.command }}</span><br>
+          <span style="color:#52606d;">{{ item.message|ucfirst }}.{% if item.lastOkAgo %} Last ran fine {{ item.lastOkAgo }} ago.{% endif %}</span>
+        </mj-text>
+        <mj-raw>{% endfor %}</mj-raw>
+        <mj-raw>{% for item in recovered %}</mj-raw>
+        <mj-text padding="0 0 16px">
+          <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;color:#ffffff;background:#059669;">Back to normal</span><br>
+          <span class="cg-code">{{ item.command }}</span>
+        </mj-text>
+        <mj-raw>{% endfor %}</mj-raw>
+        <mj-button href="{{ url }}" background-color="#0f2a27" color="#5eead4" font-weight="600" border-radius="999px" align="left" padding="8px 0 20px">See every command</mj-button>
+      </mj-column>
+    </mj-section>
+    <mj-section padding="12px 0 28px">
+      <mj-column>
+        <mj-text font-size="12px" color="#7b8794">Sent by Cron Guard on {{ siteName }}.</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

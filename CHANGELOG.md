@@ -11,3 +11,4 @@
 - A health URL for uptime monitors: 200 while every command is fine, 503 when one isn't.
 - `cron-guard/check`, `cron-guard/check/status` and `cron-guard/check/test-alert` commands.
 - `Alerts::EVENT_BEFORE_SEND`, to send alerts your own way.
+- HTML alert emails, and `emailTemplate` to use a site template of your own, written in Twig or MJML.

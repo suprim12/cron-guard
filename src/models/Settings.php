@@ -77,6 +77,12 @@ class Settings extends Model
     public bool $checkFromWeb = true;
 
     /**
+     * A site template for the HTML of alert emails, such as `_emails/cron-guard` or `_emails/cron-guard.mjml`. A `.mjml`
+     * template is compiled as it’s sent, which needs the spatie/mjml-php package. Empty uses Cron Guard’s own.
+     */
+    public string $emailTemplate = '';
+
+    /**
      * @return string[]
      */
     public function emailList(): array

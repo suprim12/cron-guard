@@ -20,6 +20,9 @@
     "php": ">=8.2",
     "craftcms/cms": "^5.6.0"
   },
+  "suggest": {
+    "spatie/mjml-php": "Compiles .mjml email templates as alerts are sent (also needs Node and the mjml npm package)"
+  },
   "require-dev": {
     "craftcms/ecs": "dev-main",
     "craftcms/phpstan": "dev-main",

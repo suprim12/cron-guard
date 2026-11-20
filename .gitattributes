@@ -18,3 +18,4 @@ tests/ export-ignore
 phpunit.xml.dist export-ignore
 docs/ export-ignore
 vercel.json export-ignore
+resources/ export-ignore

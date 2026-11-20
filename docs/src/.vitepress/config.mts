@@ -43,6 +43,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       { text: 'How It Works', link: '/guides/how-it-works' },
       { text: 'What’s Watched', link: '/guides/watched' },
       { text: 'Alerts', link: '/guides/alerts' },
+      { text: 'Email Templates', link: '/guides/email-templates' },
       { text: 'Health URL', link: '/guides/health-url' },
       { text: 'The Utility Page', link: '/guides/utility' },
       { text: 'Console Commands', link: '/guides/console' },

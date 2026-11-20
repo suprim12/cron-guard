@@ -18,7 +18,7 @@ Most Craft sites have a few commands on a timer, such as `queue/run`, a nightly 
   - **Stuck:** a run started over an hour ago (or five times its usual time) and hasn't finished. This also catches runs killed for running out of memory or time.
   - **Slow:** a run took three times longer than usual.
   - **Cron isn't running:** every command with a schedule is overdue at once, so the crontab itself has most likely stopped.
-- **Sends each problem once.** Alerts go by email, to Slack, Discord or Microsoft Teams, and to any webhook as JSON. A problem that's still there is sent again after 24 hours, and you get a message when it's back to normal.
+- **Sends each problem once.** Alerts go by email (HTML, with your own Twig or MJML template if you like), to Slack, Discord or Microsoft Teams, and to any webhook as JSON. A problem that's still there is sent again after 24 hours, and you get a message when it's back to normal.
 - **Health URL for uptime monitors.** It answers 200 while every command is fine and 503 when one isn't, and runs the check as well, so alerts go out even on a site nobody visits.
 
 ## Requirements
