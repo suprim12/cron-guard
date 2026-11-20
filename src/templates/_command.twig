@@ -24,7 +24,7 @@
 		</form>
 	</div>
 
-	<div class="tablepane">
+	<div class="cron-guard-table">
 		<table class="data fullwidth cron-guard-runs">
 			<thead>
 				<tr>
@@ -58,6 +58,7 @@
 </div>
 
 {% css %}
+.cron-guard-table { overflow-x: auto; margin-bottom: 16px; }
 .cron-guard-state { white-space: nowrap; }
 .cron-guard-state .status { margin-inline-end: 6px; }
 .cron-guard-runs td, .cron-guard-runs th { vertical-align: top; }

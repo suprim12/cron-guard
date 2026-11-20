@@ -130,7 +130,7 @@ class AlertsTest extends TestCase
     {
         \yii\base\Event::off(Alerts::class, Alerts::EVENT_BEFORE_SEND, [$this, 'catchAlert']);
         $requests = [];
-        $stack = HandlerStack::create(new MockHandler([new Response(200), new Response(200), new Response(500), new Response(200)]));
+        $stack = HandlerStack::create(new MockHandler([new Response(200), new Response(200), new Response(500), new Response(200), new Response(202)]));
         $stack->push(Middleware::history($requests));
         $alerts = $this->plugin()->alerts;
         $alerts->httpHandler = $stack;
@@ -159,6 +159,14 @@ class AlertsTest extends TestCase
             $this->assertArrayHasKey('content', json_decode((string)$requests[2]['request']->getBody(), true));
             $this->assertNotTrue($results['Chat']);
             $this->assertTrue($results['Webhook']);
+
+            // Teams workflows read an Adaptive Card.
+            $settings->chatWebhook = 'https://prod-01.westus.logic.azure.com/workflows/x/triggers/manual/paths/invoke';
+            $settings->webhookUrl = '';
+            $alerts->sendTest();
+            $card = json_decode((string)$requests[4]['request']->getBody(), true);
+            $this->assertSame('application/vnd.microsoft.card.adaptive', $card['attachments'][0]['contentType']);
+            $this->assertStringContainsString('test alert', $card['attachments'][0]['content']['body'][0]['text']);
         } finally {
             $alerts->httpHandler = null;
         }

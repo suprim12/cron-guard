@@ -2,7 +2,7 @@
 
 **Know when your scheduled commands stop running.** Cron Guard records every Craft command your server's cron runs, learns how often each one runs, and tells you when one fails, gets stuck, runs slow or stops running altogether. There's nothing to set up: install it and it starts watching.
 
-Free, and MIT licensed.
+Free, and MIT licensed. **[Documentation](https://plugins.cronguard.suprim.com.au)**
 
 ## Why
 

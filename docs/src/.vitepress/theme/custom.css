@@ -1,0 +1,66 @@
+/* Brand: a mint on deep teal. Links on light pages use a darker teal that stays readable. */
+:root {
+  --cg-brand: #5eead4;
+  --cg-ink: #0f2a27;
+  --vp-c-brand-1: #0f766e;
+  --vp-c-brand-2: #115e59;
+  --vp-c-brand-3: #0f766e;
+  --vp-c-brand-soft: rgba(94, 234, 212, 0.22);
+  --vp-button-brand-bg: #0f2a27;
+  --vp-button-brand-text: #5eead4;
+  --vp-button-brand-hover-bg: #17403b;
+  --vp-button-brand-hover-text: #99f6e4;
+  --vp-button-brand-active-bg: #081816;
+  --cg-mat: #eef2f1;
+  --cg-red: #dc2626;
+  --cg-amber: #d97706;
+  --cg-green: #059669;
+}
+
+.dark {
+  --vp-c-brand-1: #5eead4;
+  --vp-c-brand-2: #99f6e4;
+  --vp-c-brand-3: #2dd4bf;
+  --vp-c-brand-soft: rgba(94, 234, 212, 0.14);
+  --vp-button-brand-bg: #5eead4;
+  --vp-button-brand-text: #0f2a27;
+  --vp-button-brand-hover-bg: #99f6e4;
+  --vp-button-brand-hover-text: #0f2a27;
+  --cg-mat: #1c2524;
+  --cg-red: #f87171;
+  --cg-amber: #fbbf24;
+  --cg-green: #34d399;
+}
+
+/* Screenshots sit on a soft mat so they read as pictures of the control panel. */
+.vp-doc img {
+  display: block;
+  margin: 24px 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--cg-mat);
+}
+
+/* ---------- Home (CgHome.vue) ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .cg-motion .ch [data-reveal] {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  .cg-motion .ch [data-reveal].is-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  .ch-cells > :nth-child(3n + 2) { transition-delay: 0.08s; }
+  .ch-cells > :nth-child(3n) { transition-delay: 0.16s; }
+}
+
+@media (min-width: 960px) {
+  .VPContent:has(.ch) { padding-top: var(--vp-nav-height); }
+}
+.Layout:has(.ch) .VPNavBar .divider-line { display: none; }
+.Layout:has(.ch) .VPNav .divider { display: none; }

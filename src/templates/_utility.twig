@@ -47,7 +47,7 @@
 			</form>
 		</div>
 
-		<div class="tablepane">
+		<div class="cron-guard-table">
 			<table class="data fullwidth">
 				<thead>
 					<tr>
@@ -95,7 +95,8 @@
 </div>
 
 {% css %}
-.cron-guard-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.cron-guard-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 16px; }
+.cron-guard-table { overflow-x: auto; margin-bottom: 16px; }
 .cron-guard-head p { margin: 0; font-weight: 600; }
 .cron-guard-state { white-space: nowrap; }
 .cron-guard-state .status { margin-inline-end: 6px; }

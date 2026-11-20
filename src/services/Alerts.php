@@ -163,9 +163,9 @@ class Alerts extends Component
     }
 
     /**
-     * Slack and Teams read `text`; Discord reads `content`.
+     * Slack and Teams’ older connectors read `text`, Discord reads `content`, and Teams workflows read an Adaptive Card.
      *
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     private function chatPayload(string $url, AlertEvent $event): array
     {
@@ -173,6 +173,23 @@ class Alerts extends Component
         $host = (string)parse_url($url, PHP_URL_HOST);
         if (str_ends_with($host, 'discord.com') || str_ends_with($host, 'discordapp.com')) {
             return ['content' => mb_substr(str_replace('*', '**', $message), 0, 2000)];
+        }
+        if (str_ends_with($host, '.logic.azure.com') || str_ends_with($host, '.powerplatform.com') || str_ends_with($host, '.powerautomate.com')) {
+            return [
+                'type' => 'message',
+                'attachments' => [[
+                    'contentType' => 'application/vnd.microsoft.card.adaptive',
+                    'content' => [
+                        '$schema' => 'http://adaptivecards.io/schemas/adaptive-card.json',
+                        'type' => 'AdaptiveCard',
+                        'version' => '1.4',
+                        'body' => [
+                            ['type' => 'TextBlock', 'text' => $event->subject, 'weight' => 'Bolder', 'wrap' => true],
+                            ['type' => 'TextBlock', 'text' => $event->text, 'wrap' => true],
+                        ],
+                    ],
+                ]],
+            ];
         }
 
         return ['text' => $message];

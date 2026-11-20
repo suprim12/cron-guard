@@ -16,3 +16,5 @@ tests/ export-ignore
 
 # Front-end source (built files ship in src/web/assets)
 phpunit.xml.dist export-ignore
+docs/ export-ignore
+vercel.json export-ignore

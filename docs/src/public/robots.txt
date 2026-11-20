@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://plugins.cronguard.suprim.com.au/sitemap.xml

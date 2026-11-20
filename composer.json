@@ -13,7 +13,7 @@
     "email": "support@suprim.com.au",
     "issues": "https://github.com/suprim12/cron-guard/issues?state=open",
     "source": "https://github.com/suprim12/cron-guard",
-    "docs": "https://github.com/suprim12/cron-guard#readme",
+    "docs": "https://plugins.cronguard.suprim.com.au/",
     "rss": "https://github.com/suprim12/cron-guard/releases.atom"
   },
   "require": {
@@ -37,7 +37,7 @@
     "class": "suprim\\cronguard\\Plugin",
     "developerUrl": "https://suprim.com.au",
     "developerEmail": "support@suprim.com.au",
-    "documentationUrl": "https://github.com/suprim12/cron-guard#readme",
+    "documentationUrl": "https://plugins.cronguard.suprim.com.au/",
     "changelogUrl": "https://raw.githubusercontent.com/suprim12/cron-guard/main/CHANGELOG.md"
   },
   "scripts": {

@@ -1,0 +1,14 @@
+{
+  "name": "cron-guard-docs",
+  "version": "1.0.0",
+  "description": "Cron Guard for Craft CMS documentation",
+  "private": true,
+  "scripts": {
+    "docs:dev": "vitepress dev src",
+    "docs:build": "vitepress build src",
+    "docs:preview": "vitepress preview src"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  }
+}
