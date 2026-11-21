@@ -1,6 +1,6 @@
 # Release Notes for Cron Guard
 
-## 1.0.0 - Unreleased
+## 1.0.0 - 2026-11-21
 
 ### Added
 - Records every Craft command cron runs: when it started, how long it took, its memory use, and how it ended, including the error of an exception or a crash.
