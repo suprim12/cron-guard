@@ -83,7 +83,10 @@ class ScheduleTest extends TestCase
         $id = $this->command($runs);
         $status = $this->statusOf($id);
         $this->assertSame(Checker::FAILING, $status['state']);
-        $this->assertSame('failed with exit code 1: Couldn’t reach the feed.', $status['message']);
+        $this->assertSame('failed with exit code 1: Couldn’t reach the feed', $status['message'], 'The error’s own full stop is left out: the message gets one where it’s shown.');
+        $text = $this->plugin()->alerts->text(['problems' => [$status], 'recovered' => [], 'stopped' => false]);
+        $this->assertStringContainsString('Couldn’t reach the feed. Last ran fine', $text);
+        $this->assertStringNotContainsString('..', $text);
     }
 
     public function testStuck(): void

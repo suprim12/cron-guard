@@ -79,5 +79,10 @@ class PagesTest extends TestCase
         $this->assertStringContainsString('chatWebhook', $html);
         $this->assertStringContainsString('migrate/*', $html);
         $this->assertStringContainsString('cron-guard/commands/test-alert', $html);
+
+        $this->settings()->healthToken = 'cron-guard-test-token';
+        $html = (string)$method->invoke($this->plugin());
+        $url = \craft\helpers\UrlHelper::siteUrl(Craft::$app->getConfig()->getGeneral()->actionTrigger . '/cron-guard/health');
+        $this->assertStringContainsString(htmlspecialchars($url), $html, 'The health URL on the site, not in the control panel.');
     }
 }

@@ -1,5 +1,12 @@
 # Release Notes for Cron Guard
 
+## 1.0.1 - 2026-11-22
+
+### Fixed
+- A long run still going, such as a queue run working through an import while cron starts the next ones each minute, was reported as killed after ten minutes, then as back to normal once it finished. A run whose process is still going on the same server is now left alone.
+- The health URL on the settings page was the control panel’s address, which uptime monitors can’t reach where the control panel is on its own domain or limited to some IPs. It’s now the site’s own address.
+- Failed runs whose error ends with a full stop were reported with two, such as “Couldn’t connect.. Last ran fine”.
+
 ## 1.0.0 - 2026-11-21
 
 ### Added

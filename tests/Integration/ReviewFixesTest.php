@@ -39,6 +39,31 @@ class ReviewFixesTest extends TestCase
         $this->assertNull($this->plugin()->checker->recentRuns($id)[1]['exitCode']);
     }
 
+    public function testALongRunStillGoingIsntCountedAsKilled(): void
+    {
+        // A queue run working through a long import for 20 minutes, while cron starts the next ones each minute. Its
+        // process is still running here: this one, for the test.
+        $id = $this->command([['ago' => 30, 'exitCode' => null], ['ago' => 1200, 'exitCode' => null, 'pid' => getmypid(), 'host' => (string)gethostname()], ...$this->every(60, 5, 1260)]);
+        $this->plugin()->checker->closeAbandoned(time());
+
+        $this->assertNull($this->plugin()->checker->recentRuns($id)[1]['exitCode'], 'Still running, so not killed.');
+        $this->assertNotSame(Checker::FAILING, $this->statusOf($id)['state']);
+    }
+
+    public function testARunWhoseProcessHasGoneIsKilled(): void
+    {
+        // The same, but its process has gone without finishing the run.
+        $id = $this->command([['ago' => 30, 'exitCode' => null], ['ago' => 1200, 'exitCode' => null, 'pid' => 2147483000, 'host' => (string)gethostname()], ...$this->every(60, 5, 1260)]);
+        $this->plugin()->checker->closeAbandoned(time());
+
+        $this->assertSame(Runs::EXIT_ABANDONED, (int)$this->plugin()->checker->recentRuns($id)[1]['exitCode']);
+    }
+
+    public function testRunsRecordTheirProcess(): void
+    {
+        $this->assertSame(['pid' => getmypid(), 'host' => (string)gethostname()], $this->plugin()->runs->process());
+    }
+
     public function testARunningCommandIsntMissed(): void
     {
         // Every 5 minutes, and the latest run started 11 minutes ago and is still going.

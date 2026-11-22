@@ -35,7 +35,7 @@ use yii\web\Response;
  */
 class Plugin extends BasePlugin
 {
-    public string $schemaVersion = '1.0.0';
+    public string $schemaVersion = '1.0.1';
     public bool $hasCpSettings = true;
 
     public static function config(): array
@@ -97,7 +97,8 @@ class Plugin extends BasePlugin
         return Craft::$app->getView()->renderTemplate('cron-guard/_settings', [
             'settings' => $this->getSettings(),
             'overrides' => array_keys(Craft::$app->getConfig()->getConfigFromFile('cron-guard')),
-            'healthUrl' => \craft\helpers\UrlHelper::actionUrl('cron-guard/health'),
+            // The site’s address, not the control panel’s: that may be on its own domain, or closed to all but some IPs.
+            'healthUrl' => \craft\helpers\UrlHelper::siteUrl(Craft::$app->getConfig()->getGeneral()->actionTrigger . '/cron-guard/health'),
         ]);
     }
 }

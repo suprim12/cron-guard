@@ -70,7 +70,7 @@ class Runs extends Component
             Db::insert(self::TABLE_RUNS, [
                 'commandId' => $commandId,
                 'startedAt' => Db::prepareDateForDb(new DateTime()),
-            ]);
+            ] + ($this->hasProcessColumns() ? $this->process() : []));
             $this->current = [
                 'runId' => (int)Craft::$app->getDb()->getLastInsertID(),
                 'commandId' => $commandId,
@@ -140,6 +140,47 @@ class Runs extends Component
             Plugin::getInstance()->checker->afterRun($current['commandId']);
         } catch (Throwable $e) {
             Craft::warning('Cron Guard couldn’t finish recording a run: ' . $e->getMessage(), 'cron-guard');
+        }
+    }
+
+    /**
+     * This process and the server it’s on, recorded with each run.
+     *
+     * @return array{pid: int, host: string}
+     */
+    public function process(): array
+    {
+        return ['pid' => (int)getmypid(), 'host' => mb_substr((string)gethostname(), 0, 255)];
+    }
+
+    /**
+     * Whether a run’s process is still going: true or false when it’s on this server and that can be told, null otherwise.
+     */
+    public function processRunning(?int $pid, ?string $host): ?bool
+    {
+        if (!$pid || $host === null || $host !== (string)gethostname()) {
+            return null;
+        }
+        if (function_exists('posix_kill')) {
+            // Signal 0 only asks. A process of another user answers “not permitted”, but it’s there.
+            return @posix_kill($pid, 0) || (function_exists('posix_get_last_error') && posix_get_last_error() === 1);
+        }
+        if (is_dir('/proc/self')) {
+            return is_dir("/proc/$pid");
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether the runs table has the process columns yet: not until the 1.0.1 migration has run.
+     */
+    private function hasProcessColumns(): bool
+    {
+        try {
+            return Craft::$app->getDb()->getTableSchema(self::TABLE_RUNS)?->getColumn('pid') !== null;
+        } catch (Throwable) {
+            return false;
         }
     }
 

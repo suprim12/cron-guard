@@ -83,7 +83,7 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * @param array{ago: int, seconds?: int, exitCode?: int|null, error?: string} $run
+     * @param array{ago: int, seconds?: int, exitCode?: int|null, error?: string, pid?: int, host?: string} $run
      */
     protected function addRun(int $commandId, array $run, ?int $now = null): void
     {
@@ -98,7 +98,7 @@ abstract class TestCase extends BaseTestCase
             'durationMs' => $exitCode === null ? null : $seconds * 1000,
             'exitCode' => $exitCode,
             'error' => $run['error'] ?? null,
-        ]);
+        ] + array_intersect_key($run, ['pid' => true, 'host' => true]));
     }
 
     /**

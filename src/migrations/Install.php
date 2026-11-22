@@ -43,6 +43,9 @@ class Install extends Migration
             'exitCode' => $this->smallInteger(),
             'error' => $this->text(),
             'memory' => $this->bigInteger(),
+            // The process and server running it, to tell a run still going from one that was killed.
+            'pid' => $this->integer(),
+            'host' => $this->string(255),
         ]);
         $this->createIndex(null, Runs::TABLE_RUNS, ['commandId', 'startedAt']);
         $this->addForeignKey(null, Runs::TABLE_RUNS, ['commandId'], Runs::TABLE_COMMANDS, ['id'], 'CASCADE');

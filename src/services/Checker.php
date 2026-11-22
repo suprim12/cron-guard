@@ -127,7 +127,9 @@ class Checker extends Component
             $message = 'stopped before it finished: killed for using too much memory or time, or the server restarted';
         } elseif ($lastFinished !== null && (int)$lastFinished['exitCode'] !== 0) {
             $state = self::FAILING;
-            $message = sprintf('failed with exit code %d%s', $lastFinished['exitCode'], $lastFinished['error'] ? ': ' . $lastFinished['error'] : '');
+            // Without the error’s own full stop, as the message gets one wherever it’s shown.
+            $error = rtrim((string)$lastFinished['error'], ". \t\r\n");
+            $message = sprintf('failed with exit code %d%s', $lastFinished['exitCode'], $error !== '' ? ': ' . $error : '');
         } elseif (!$running && $interval !== null && $status['lastStart'] !== null && $now - $status['lastStart'] > $longestGap + $this->grace($interval)) {
             $state = self::OVERDUE;
             $message = sprintf('hasn’t run for %s; it usually runs %s', $this->duration($now - $status['lastStart']), $this->every($interval));
@@ -242,11 +244,19 @@ class Checker extends Component
      * Closes runs that were killed before they could finish (out of memory, a time limit, a restart), once a newer run
      * of the same command has started and they’ve been open five times their usual time, and at least ten minutes.
      * They count as failed. The newest run is left open: it’s reported as stuck instead.
+     *
+     * A run whose process is still going on this server is left open, such as a long queue run while cron starts the
+     * next ones each minute, for up to a day, in case its process ID has been used again since.
      */
     public function closeAbandoned(int $now): void
     {
-        $open = (new Query())->select(['id', 'commandId', 'startedAt'])->from(Runs::TABLE_RUNS)->where(['exitCode' => null])->all();
+        $open = (new Query())->from(Runs::TABLE_RUNS)->where(['exitCode' => null])->all();
+        $runs = Plugin::getInstance()->runs;
         foreach ($open as $run) {
+            $age = $now - $this->timestamp($run['startedAt']);
+            if ($age < 86400 && $runs->processRunning(isset($run['pid']) ? (int)$run['pid'] : null, $run['host'] ?? null) === true) {
+                continue;
+            }
             $newer = (new Query())->from(Runs::TABLE_RUNS)
                 ->where(['commandId' => $run['commandId']])
                 ->andWhere(['>', 'id', $run['id']])
@@ -259,7 +269,7 @@ class Checker extends Component
                 ->andWhere(['not', ['durationMs' => null]])
                 ->orderBy(['id' => SORT_DESC])->limit(self::RUNS_LOOKED_AT)->column();
             $usual = $usual ? $this->median(array_map('intval', $usual)) / 1000 : 0;
-            if ($now - $this->timestamp($run['startedAt']) > max(600, $usual * 5)) {
+            if ($age > max(600, $usual * 5)) {
                 Db::update(Runs::TABLE_RUNS, [
                     'exitCode' => Runs::EXIT_ABANDONED,
                     'error' => 'Stopped before it finished.',
