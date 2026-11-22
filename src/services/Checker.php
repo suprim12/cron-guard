@@ -491,6 +491,10 @@ class Checker extends Component
      */
     public function duration(float|int $seconds): string
     {
+        // Such as a queue run with nothing to do, rather than “0 seconds”.
+        if ($seconds < 0.5) {
+            return 'under a second';
+        }
         $seconds = (int)round($seconds);
         [$value, $unit] = match (true) {
             $seconds < 60 => [$seconds, 'second'],

@@ -35,7 +35,7 @@ use yii\web\Response;
  */
 class Plugin extends BasePlugin
 {
-    public string $schemaVersion = '1.0.1';
+    public string $schemaVersion = '1.0.2';
     public bool $hasCpSettings = true;
 
     public static function config(): array

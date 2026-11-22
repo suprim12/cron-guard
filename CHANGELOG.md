@@ -1,5 +1,11 @@
 # Release Notes for Cron Guard
 
+## 1.0.2 - 2026-11-22
+
+### Fixed
+- Each queue job was listed as a command of its own, such as `queue/exec 672202 300 1 2761154`: `queue/run` runs each job in a process of its own. Those are no longer watched, whatever the Don’t watch list says, and the ones recorded are removed. A job’s time still counts in its `queue/run`.
+- Runs shorter than half a second showed as taking “0 seconds”; they now take “under a second”.
+
 ## 1.0.1 - 2026-11-22
 
 ### Fixed

@@ -29,6 +29,12 @@ class Runs extends Component
     public const TABLE_COMMANDS = '{{%cronguard_commands}}';
     public const TABLE_RUNS = '{{%cronguard_runs}}';
 
+    /**
+     * Commands never watched, whatever the settings say: the process `queue/run` starts for each job (Yii’s queue
+     * isolates jobs), named by the job’s ID, so each job would be a command of its own. Its time is the run’s.
+     */
+    public const NEVER_WATCHED = ['queue/exec'];
+
     /** The exit code of a run that never finished: the process was killed, or the server restarted. */
     public const EXIT_ABANDONED = -1;
 
@@ -57,7 +63,7 @@ class Runs extends Component
         $controller = $event->action->controller;
         $route = $event->action->id === $controller->defaultAction ? $controller->getUniqueId() : $event->action->getUniqueId();
         $settings = Plugin::getInstance()->getSettings();
-        if ($this->isIgnored([$route, $event->action->getUniqueId()], $settings->ignore)) {
+        if ($this->isIgnored([$route, $event->action->getUniqueId()], [...self::NEVER_WATCHED, ...$settings->ignore])) {
             return;
         }
         if (!$settings->watchInteractive && $this->isInteractive()) {

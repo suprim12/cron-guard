@@ -85,6 +85,14 @@ class RecordingTest extends TestCase
         $this->assertFalse((new Query())->from(Runs::TABLE_COMMANDS)->where(['like', 'command', 'plugin/enable%', false])->exists());
     }
 
+    public function testQueueJobProcessesArentCommands(): void
+    {
+        // The process `queue/run` starts for each job, even when the saved settings don’t list it.
+        $this->settings()->ignore = ['help'];
+        $this->craft('queue/exec 999999999 300 1 1');
+        $this->assertFalse((new Query())->from(Runs::TABLE_COMMANDS)->where(['like', 'command', 'queue/exec%', false])->exists());
+    }
+
     public function testCommandNames(): void
     {
         $runs = $this->plugin()->runs;

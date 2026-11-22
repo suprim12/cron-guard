@@ -137,6 +137,8 @@ class ScheduleTest extends TestCase
     {
         $checker = $this->plugin()->checker;
         $this->assertSame('45 seconds', $checker->duration(45));
+        $this->assertSame('under a second', $checker->duration(0.2), 'Not “0 seconds”.');
+        $this->assertSame('1 second', $checker->duration(0.6));
         $this->assertSame('5 minutes', $checker->duration(300));
         $this->assertSame('1 hour', $checker->duration(3600));
         $this->assertSame('1.5 hours', $checker->duration(5400));
