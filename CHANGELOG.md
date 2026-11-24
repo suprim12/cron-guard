@@ -1,6 +1,6 @@
 # Release Notes for Cron Guard
 
-## 1.0.3 - Unreleased
+## 1.0.3 - 2026-11-24
 
 ### Fixed
 - Commands on the Don’t watch list, such as `migrate/*` and `plugin/*`, were watched once the settings page had been saved: the list was saved as one line. It’s split into its lines again, including a list already saved that way.
