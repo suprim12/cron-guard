@@ -7,7 +7,7 @@
 | Column | Shows |
 |---|---|
 | **Command** | As cron ran it, with its arguments. Click it to see its runs. |
-| **Status** | OK, Failed, Missed, Stuck, Slow, Learning, No schedule or Muted, with what's wrong. |
+| **Status** | OK, Failed, Stuck, Overlapping, Missed, Slow, Memory, Learning, No schedule or Muted, with what's wrong. |
 | **Runs** | Its schedule, “Learning: 2 of 4 runs”, or Irregular. |
 | **Last run** | How long ago it last started. |
 | **Usually takes** | Its usual run time. |
@@ -16,7 +16,7 @@
 
 ## A command's runs
 
-Click a command to see its last 100 runs: when each started, how long it took, how it ended with its error message, and its peak memory.
+Click a command to see its last 100 runs: when each started, how long it took, how it ended with its error message and the errors and warnings it logged, and its peak memory with PHP's memory limit.
 
 ![A command's runs: the latest failed with a timeout, the ones before ran fine](/images/command.jpg)
 

@@ -31,10 +31,18 @@ class Checker extends Component
     public const STUCK = 'stuck';
     public const OVERDUE = 'overdue';
     public const SLOW = 'slow';
+    public const OVERLAPPING = 'overlapping';
+    public const MEMORY = 'memory';
     public const MUTED = 'muted';
 
     /** States that are problems, worst first. */
-    public const PROBLEMS = [self::FAILING, self::STUCK, self::OVERDUE, self::SLOW];
+    public const PROBLEMS = [self::FAILING, self::STUCK, self::OVERLAPPING, self::OVERDUE, self::SLOW, self::MEMORY];
+
+    /** Problems about how the last run went rather than whether it ran: not followed by “back to normal”. */
+    public const WARNINGS = [self::SLOW, self::MEMORY];
+
+    /** Seconds two copies of a command must both have been running before they count as overlapping. */
+    private const OVERLAP_SECONDS = 60;
 
     /** Runs needed before a schedule is learnt. */
     public const RUNS_TO_LEARN = 4;
@@ -75,7 +83,6 @@ class Checker extends Component
     {
         $settings = Plugin::getInstance()->getSettings();
         $starts = array_map(fn($run) => $this->timestamp($run['startedAt']), $runs);
-        $durations = array_map(fn($run) => (int)$run['durationMs'] / 1000, array_filter($runs, fn($run) => $run['durationMs'] !== null));
         $last = $runs[0] ?? null;
         $lastFinished = null;
         foreach ($runs as $run) {
@@ -84,6 +91,7 @@ class Checker extends Component
                 break;
             }
         }
+        $durations = array_map(fn($run) => (int)$run['durationMs'] / 1000, array_filter($runs, fn($run) => $run['durationMs'] !== null));
 
         $interval = $this->configuredInterval($command, $settings->schedules);
         $learnt = $interval === null;
@@ -93,9 +101,9 @@ class Checker extends Component
         if ($interval === null && ($schedule = $this->learntSchedule($starts))) {
             [$interval, $longestGap] = $schedule;
         }
-        // The usual duration leaves out the newest run, so a slow one is compared with the ones before it. A newest
-        // run without a duration (running, or killed) isn’t in it already.
-        $usualDuration = $this->median(array_slice($durations, $last !== null && $last['durationMs'] !== null ? 1 : 0));
+        // The usual duration leaves out the last finished run, so a slow one is compared with the ones before it.
+        $others = array_filter($runs, fn($run) => $run['durationMs'] !== null && $run['id'] !== ($lastFinished['id'] ?? null));
+        $usualDuration = $this->median(array_map(fn($run) => (int)$run['durationMs'] / 1000, $others));
 
         $status = [
             'id' => (int)$command['id'],
@@ -112,6 +120,8 @@ class Checker extends Component
             'lastRun' => $last,
             'lastOk' => $this->lastOk($runs),
             'usualDuration' => $usualDuration,
+            'copies' => 0,
+            'log' => [],
             'state' => self::OK,
             'message' => '',
         ];
@@ -120,10 +130,16 @@ class Checker extends Component
         $message = '';
         $running = $last !== null && $last['exitCode'] === null;
         $stuckAfter = max($settings->stuckMinutes * 60, ($usualDuration ?? 0) * 5);
+        $copies = $this->runningCopies($runs, $now);
+        $status['copies'] = count($copies);
+        $memory = $lastFinished !== null ? $this->memoryUse($lastFinished) : null;
 
         if ($running && $settings->stuckMinutes > 0 && $now - $status['lastStart'] > $stuckAfter) {
             $state = self::STUCK;
             $message = sprintf('started %s ago and hasn’t finished: it’s stuck, or was stopped before it could (out of memory, a time limit or a restart)', $this->duration($now - $status['lastStart']));
+        } elseif (count($copies) > 1 && !Plugin::getInstance()->runs->isIgnored([$command['command'], $command['route']], $settings->allowOverlap)) {
+            $state = self::OVERLAPPING;
+            $message = sprintf('is running %d times at once, the oldest started %s ago: each run takes longer than the time between them', count($copies), $this->duration($now - $this->timestamp(end($copies)['startedAt'])));
         } elseif ($lastFinished !== null && (int)$lastFinished['exitCode'] === Runs::EXIT_ABANDONED) {
             $state = self::FAILING;
             $message = 'stopped before it finished: killed for using too much memory or time, or the server restarted';
@@ -132,13 +148,18 @@ class Checker extends Component
             // Without the error’s own full stop, as the message gets one wherever it’s shown.
             $error = rtrim((string)$lastFinished['error'], ". \t\r\n");
             $message = sprintf('failed with exit code %d%s', $lastFinished['exitCode'], $error !== '' ? ': ' . $error : '');
+            $status['log'] = $this->runLog($lastFinished);
         } elseif (!$running && $interval !== null && $status['lastStart'] !== null && $now - $status['lastStart'] > $longestGap + $this->grace($interval)) {
             $state = self::OVERDUE;
             $message = sprintf('hasn’t run for %s; it usually runs %s', $this->duration($now - $status['lastStart']), $this->every($interval));
-        } elseif (!$running && $lastFinished !== null && $usualDuration !== null && count($durations) > self::RUNS_TO_LEARN
+        } elseif ($lastFinished !== null && $usualDuration !== null && count($durations) > self::RUNS_TO_LEARN
             && $lastFinished['durationMs'] / 1000 > $usualDuration * 3 && $lastFinished['durationMs'] / 1000 - $usualDuration > 60) {
+            // Judged on the last finished run, running or not, so a check while the next one runs doesn’t clear it.
             $state = self::SLOW;
             $message = sprintf('took %s; it usually takes %s', $this->duration($lastFinished['durationMs'] / 1000), $this->duration($usualDuration));
+        } elseif ($memory !== null && $settings->memoryWarnPercent > 0 && $memory[0] >= $memory[1] * $settings->memoryWarnPercent / 100) {
+            $state = self::MEMORY;
+            $message = sprintf('used %s of its %s memory limit: it’ll be killed if it needs much more', $this->megabytes($memory[0]), $this->megabytes($memory[1]));
         } elseif ($interval === null) {
             $state = count($starts) < self::RUNS_TO_LEARN ? self::LEARNING : self::IRREGULAR;
         }
@@ -206,7 +227,7 @@ class Checker extends Component
                     }
                 } elseif ($was !== null && $status['state'] !== self::MUTED) {
                     // A slow run isn’t something to recover from: the next normal one just clears it.
-                    if (!$quiet && $wasState !== self::SLOW) {
+                    if (!$quiet && !in_array($wasState, self::WARNINGS, true)) {
                         $recovered[] = $status;
                         $changes[$status['id']] = [null, $now, true];
                     } elseif ($quiet) {
@@ -442,6 +463,60 @@ class Checker extends Component
         }
 
         return null;
+    }
+
+    /**
+     * A command’s runs going at the same time, newest first: open, running for a minute or more, and not known to
+     * have stopped. A process on another server can’t be asked, so it counts until it’s closed as killed.
+     *
+     * @param array<int, array<string, mixed>> $runs
+     * @return array<int, array<string, mixed>>
+     */
+    public function runningCopies(array $runs, int $now): array
+    {
+        $processes = Plugin::getInstance()->runs;
+
+        return array_values(array_filter($runs, fn($run) => $run['exitCode'] === null
+            && $now - $this->timestamp($run['startedAt']) >= self::OVERLAP_SECONDS
+            && $processes->processRunning(isset($run['pid']) ? (int)$run['pid'] : null, $run['host'] ?? null) !== false));
+    }
+
+    /**
+     * A finished run’s peak memory and PHP’s memory limit, in bytes, when it had one.
+     *
+     * @param array<string, mixed> $run
+     * @return array{0: int, 1: int}|null
+     */
+    public function memoryUse(array $run): ?array
+    {
+        $limit = (int)($run['memoryLimit'] ?? 0);
+        $used = (int)($run['memory'] ?? 0);
+
+        return $limit > 0 && $used > 0 ? [$used, $limit] : null;
+    }
+
+    /**
+     * The errors and warnings Craft logged during a failed run.
+     *
+     * @param array<string, mixed> $run
+     * @return array<int, array{level: string, category: string, message: string}>
+     */
+    public function runLog(array $run): array
+    {
+        if (empty($run['log'])) {
+            return [];
+        }
+        $log = json_decode((string)$run['log'], true);
+
+        return is_array($log) ? $log : [];
+    }
+
+    /**
+     * Bytes in megabytes: “470 MB”.
+     */
+    public function megabytes(int|float $bytes): string
+    {
+        return round($bytes / 1048576) . ' MB';
     }
 
     /**

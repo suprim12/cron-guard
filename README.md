@@ -16,7 +16,10 @@ Most Craft sites have a few commands on a timer, such as `queue/run`, a nightly 
   - **Failed:** a run ended with an error.
   - **Missed:** it hasn't run when it usually does. It allows half its interval for lateness, at least 5 minutes and at most 2 hours.
   - **Stuck:** a run started over an hour ago (or five times its usual time) and hasn't finished. This also catches runs killed for running out of memory or time.
+  - **Overlapping:** runs of the command are piling up, each taking longer than the time between them.
   - **Slow:** a run took three times longer than usual.
+  - **Memory:** a run used 85% of PHP's memory limit, so it's close to being killed for running out.
+  - With a failure, the errors and warnings Craft logged while it ran, so you can see why without opening log files.
   - **Cron isn't running:** every command with a schedule is overdue at once, so the crontab itself has most likely stopped.
 - **Sends each problem once.** Alerts go by email (HTML, with your own Twig or MJML template if you like), to Slack, Discord or Microsoft Teams, and to any webhook as JSON. A problem that's still there is sent again after 24 hours, and you get a message when it's back to normal.
 - **Health URL for uptime monitors.** It answers 200 while every command is fine and 503 when one isn't, and runs the check as well, so alerts go out even on a site nobody visits.

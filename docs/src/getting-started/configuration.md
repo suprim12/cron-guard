@@ -21,6 +21,8 @@ return [
     'keepDays' => 30,
     'remindHours' => 24,
     'stuckMinutes' => 60,
+    'memoryWarnPercent' => 85,
+    'allowOverlap' => ['queue/run'],
     'checkFromWeb' => true,
     'emailTemplate' => '',
 ];
@@ -40,6 +42,8 @@ return [
 | `keepDays` | `30` | Days of runs kept. At most 1,000 runs a command are kept either way. |
 | `remindHours` | `24` | Hours before a problem that's still there is sent again. `0` sends it once. |
 | `stuckMinutes` | `60` | Minutes a run may take before it counts as stuck, unless it usually takes longer. |
+| `memoryWarnPercent` | `85` | Percent of PHP's memory limit a run may use before its command is reported as near the limit. `0` turns it off. |
+| `allowOverlap` | `['queue/run']` | Commands meant to run more than once at a time, with `*` for any part, which aren't reported as overlapping. |
 | `checkFromWeb` | `true` | Run the check after control panel and site requests too, at most every five minutes. |
 | `emailTemplate` | | A site template for alert emails, in Twig or MJML. See [Email Templates](../guides/email-templates). |
 

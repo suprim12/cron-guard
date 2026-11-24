@@ -73,6 +73,20 @@ class Settings extends Model
     /** Minutes a run may take before it counts as stuck, unless it usually takes longer. */
     public int $stuckMinutes = 60;
 
+    /**
+     * Percent of PHP’s memory limit a run may use before its command is reported as near the limit, ahead of it being
+     * killed for running out. 0 turns it off.
+     */
+    public int $memoryWarnPercent = 85;
+
+    /**
+     * Commands meant to run more than once at a time, which aren’t reported as overlapping. Craft’s `queue/run` takes
+     * jobs one at a time, so several can run side by side.
+     *
+     * @var string[]
+     */
+    public array $allowOverlap = ['queue/run'];
+
     /** Run the check, at most every five minutes, after control panel and site requests too. */
     public bool $checkFromWeb = true;
 
@@ -117,6 +131,7 @@ class Settings extends Model
             }],
             [['keepDays'], 'integer', 'min' => 1],
             [['remindHours', 'stuckMinutes'], 'integer', 'min' => 0],
+            [['memoryWarnPercent'], 'integer', 'min' => 0, 'max' => 100],
         ];
     }
 }

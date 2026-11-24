@@ -132,12 +132,15 @@ class Alerts extends Component
             if (!empty($problem['reminder'])) {
                 $line .= ' (still)';
             }
-            if ($problem['state'] !== Checker::OVERDUE && $problem['state'] !== Checker::SLOW && $problem['lastOk'] !== null) {
+            if ($this->saysLastOk($problem)) {
                 $line .= sprintf('. Last ran fine %s ago.', $checker->duration(time() - $checker->timestamp($problem['lastOk']['startedAt'])));
             } elseif ($problem['state'] !== Checker::OVERDUE && $problem['state'] !== Checker::SLOW) {
                 $line .= '.';
             }
             $lines[] = $line;
+            foreach ($this->logLines($problem) as $logged) {
+                $lines[] = '    Logged: ' . $logged;
+            }
         }
         foreach ($alert['recovered'] as $recovered) {
             $lines[] = sprintf('✓ %s is running normally again.', $recovered['command']);
@@ -146,6 +149,30 @@ class Alerts extends Component
         $lines[] = $this->link();
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Whether a problem’s alert says when it last ran fine: not for ones about it running, or how its last run went.
+     *
+     * @param array<string, mixed> $status
+     */
+    private function saysLastOk(array $status): bool
+    {
+        return !empty($status['lastOk']) && in_array($status['state'], [Checker::FAILING, Checker::STUCK], true);
+    }
+
+    /**
+     * The last few errors a failed run logged, a line each, for alerts.
+     *
+     * @param array<string, mixed> $status
+     * @return string[]
+     */
+    public function logLines(array $status, int $count = 3): array
+    {
+        $errors = array_filter($status['log'] ?? [], fn($entry) => $entry['level'] === 'error');
+        $entries = array_slice($errors ?: ($status['log'] ?? []), -$count);
+
+        return array_map(fn($entry) => mb_strimwidth(preg_replace('/\s+/', ' ', $entry['message']), 0, 300, '…'), $entries);
     }
 
     /**
@@ -205,14 +232,18 @@ class Alerts extends Component
                 Checker::STUCK => 'Stuck',
                 Checker::OVERDUE => 'Missed',
                 Checker::SLOW => 'Slow',
+                Checker::OVERLAPPING => 'Overlapping',
+                Checker::MEMORY => 'Memory',
                 default => 'OK',
             },
             'message' => $status['message'],
             'reminder' => !empty($status['reminder']),
             'every' => $status['interval'] !== null ? $checker->every($status['interval']) : null,
-            'lastOkAgo' => !in_array($status['state'], [Checker::OVERDUE, Checker::SLOW], true) && !empty($status['lastOk'])
+            'lastOkAgo' => $this->saysLastOk($status)
                 ? $checker->duration(time() - $checker->timestamp($status['lastOk']['startedAt']))
                 : null,
+            'warning' => in_array($status['state'], Checker::WARNINGS, true),
+            'log' => $this->logLines($status),
         ];
         $problems = array_map($item, $event->problems);
 
@@ -291,6 +322,7 @@ class Alerts extends Component
             'reminder' => !empty($status['reminder']),
             'lastStartedAt' => $status['lastStart'] ? gmdate('c', $status['lastStart']) : null,
             'intervalSeconds' => $status['interval'],
+            'log' => $status['log'] ?? [],
         ];
 
         return [
@@ -338,6 +370,8 @@ class Alerts extends Component
             Checker::STUCK => 'is stuck',
             Checker::OVERDUE => 'hasn’t run',
             Checker::SLOW => 'ran slow',
+            Checker::OVERLAPPING => 'is running more than once',
+            Checker::MEMORY => 'is near its memory limit',
             default => $state,
         };
     }

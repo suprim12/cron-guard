@@ -14,6 +14,7 @@ use craft\db\Query;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use DateTime;
+use suprim\cronguard\log\RunLogTarget;
 use suprim\cronguard\Plugin;
 use Throwable;
 use yii\base\ActionEvent;
@@ -47,6 +48,11 @@ class Runs extends Component
 
     private ?int $exitCode = null;
 
+    private ?RunLogTarget $logTarget = null;
+
+    /** @var array<string, bool> Whether the tables have columns added since 1.0.0, until their migration has run. */
+    private array $columns = [];
+
     /** Whether this request’s command has been looked at, so commands it runs inside it aren’t recorded again. */
     private bool $started = false;
 
@@ -77,7 +83,7 @@ class Runs extends Component
             Db::insert(self::TABLE_RUNS, [
                 'commandId' => $commandId,
                 'startedAt' => Db::prepareDateForDb(new DateTime()),
-            ] + ($this->hasProcessColumns() ? $this->process() : []));
+            ] + ($this->hasColumn('pid') ? $this->process() : []));
             $this->current = [
                 'runId' => (int)Craft::$app->getDb()->getLastInsertID(),
                 'commandId' => $commandId,
@@ -87,6 +93,11 @@ class Runs extends Component
             // Never stop the command because the database couldn’t be written: before install, or mid-migration.
             Craft::warning('Cron Guard couldn’t record a run: ' . $e->getMessage(), 'cron-guard');
             return;
+        }
+
+        if ($this->hasColumn('log')) {
+            $this->logTarget = new RunLogTarget();
+            Craft::getLogger()->dispatcher->targets['cron-guard-run'] = $this->logTarget;
         }
 
         // Runs after Craft’s own fatal error handling, which waits for these, so a crash is recorded too.
@@ -137,13 +148,25 @@ class Runs extends Component
         }
 
         try {
-            Db::update(self::TABLE_RUNS, [
+            $values = [
                 'finishedAt' => Db::prepareDateForDb(new DateTime()),
                 'durationMs' => (int)round((microtime(true) - $current['started']) * 1000),
                 'exitCode' => $exitCode,
                 'error' => $error !== null ? StringHelper::safeTruncate($error, 2000) : null,
                 'memory' => memory_get_peak_usage(true),
-            ], ['id' => $current['runId']]);
+            ];
+            if ($this->hasColumn('memoryLimit')) {
+                // As it is at the end: commands such as resave raise it as they start.
+                $values['memoryLimit'] = $this->memoryLimit();
+            }
+            if ($this->logTarget !== null) {
+                $log = $this->finishLog();
+                // Only a failed run keeps what was logged; one that ran fine doesn’t need it.
+                if ($exitCode !== 0 && $log) {
+                    $values['log'] = json_encode($log, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+                }
+            }
+            Db::update(self::TABLE_RUNS, $values, ['id' => $current['runId']]);
             Plugin::getInstance()->checker->afterRun($current['commandId']);
         } catch (Throwable $e) {
             Craft::warning('Cron Guard couldn’t finish recording a run: ' . $e->getMessage(), 'cron-guard');
@@ -180,15 +203,58 @@ class Runs extends Component
     }
 
     /**
-     * Whether the runs table has the process columns yet: not until the 1.0.1 migration has run.
+     * What was logged during the run, once the logger has passed on what it still holds, and stops keeping more.
+     *
+     * @return array<int, array{level: string, category: string, message: string}>
      */
-    private function hasProcessColumns(): bool
+    private function finishLog(): array
     {
+        $target = $this->logTarget;
+        $this->logTarget = null;
         try {
-            return Craft::$app->getDb()->getTableSchema(self::TABLE_RUNS)?->getColumn('pid') !== null;
+            Craft::getLogger()->flush();
         } catch (Throwable) {
-            return false;
         }
+        unset(Craft::getLogger()->dispatcher->targets['cron-guard-run']);
+
+        return $target->entries();
+    }
+
+    /**
+     * PHP’s memory limit in bytes, or null when there’s none.
+     */
+    public function memoryLimit(): ?int
+    {
+        $value = trim((string)ini_get('memory_limit'));
+        if ($value === '' || $value === '-1') {
+            return null;
+        }
+        $bytes = (int)$value;
+        $bytes *= match (strtolower(substr($value, -1))) {
+            'g' => 1073741824,
+            'm' => 1048576,
+            'k' => 1024,
+            default => 1,
+        };
+
+        return $bytes > 0 ? $bytes : null;
+    }
+
+    /**
+     * Whether the runs table has a column yet: `pid` and `host` not until the 1.0.1 migration has run, `log` and
+     * `memoryLimit` not until 1.1.0’s.
+     */
+    private function hasColumn(string $name): bool
+    {
+        if (!isset($this->columns[$name])) {
+            try {
+                $this->columns[$name] = Craft::$app->getDb()->getTableSchema(self::TABLE_RUNS)?->getColumn($name) !== null;
+            } catch (Throwable) {
+                $this->columns[$name] = false;
+            }
+        }
+
+        return $this->columns[$name];
     }
 
     /**

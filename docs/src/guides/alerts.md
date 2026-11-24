@@ -4,7 +4,7 @@
 
 - **A new problem**, once.
 - **The same problem again** after 24 hours if it's still there (`remindHours`; `0` sends it once).
-- **Back to normal** when a failed, missed or stuck command runs fine again. Slow runs don't get one: the next normal run just clears them.
+- **Back to normal** when a failed, missed or stuck command runs fine again. Slow runs and memory warnings don't get one: the next normal run just clears them.
 
 Problems found in the same check go out together as one alert. A **muted** command never sends one.
 
@@ -50,14 +50,17 @@ Alerts are posted to the **Webhook** URL as JSON:
       "message": "failed with exit code 1: cURL error 28: …",
       "reminder": false,
       "lastStartedAt": "2026-11-21T02:00:03+00:00",
-      "intervalSeconds": 86400
+      "intervalSeconds": 86400,
+      "log": [
+        { "level": "error", "category": "feed-me", "message": "Feed request failed: cURL error 28: …" }
+      ]
     }
   ],
   "recovered": []
 }
 ```
 
-`state` is one of `failing`, `overdue`, `stuck` or `slow`. `stopped` is `true` when every scheduled command is late at once.
+`state` is one of `failing`, `stuck`, `overlapping`, `overdue`, `slow` or `memory`. `log` has the errors and warnings a failed run logged, and is empty otherwise. `stopped` is `true` when every scheduled command is late at once.
 
 ## Test alerts
 

@@ -19,7 +19,7 @@ It's rendered like any site template, with these variables:
 |---|---|
 | `subject` | The email's subject, such as `db/backup hasn't run on Green Grocer`. |
 | `preview` | A one-line summary, for the inbox preview. |
-| `problems` | Commands with a problem. Each has `command`, `state` (`failing`, `overdue`, `stuck` or `slow`), `label` (Failed, Missed, Stuck or Slow), `message`, `reminder` (`true` when it was sent before and is still there), `every` (such as “every day”, or `null`) and `lastOkAgo` (such as “1 day”, or `null`). |
+| `problems` | Commands with a problem. Each has `command`, `state` (`failing`, `stuck`, `overlapping`, `overdue`, `slow` or `memory`), `label` (Failed, Stuck, Overlapping, Missed, Slow or Memory), `warning` (`true` for slow and memory), `message`, `reminder` (`true` when it was sent before and is still there), `every` (such as “every day”, or `null`) `lastOkAgo` (such as “1 day”, or `null`) and `log` (the last few errors a failed run logged, a line each). |
 | `recovered` | Commands back to normal, with the same keys. |
 | `stopped` | `true` when every scheduled command is late at once: cron has most likely stopped. |
 | `test` | `true` for a test alert. |

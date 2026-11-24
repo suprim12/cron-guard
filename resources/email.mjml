@@ -28,9 +28,10 @@
         <mj-raw>{% endif %}</mj-raw>
         <mj-raw>{% for item in problems %}</mj-raw>
         <mj-text padding="0 0 16px">
-          <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;color:#ffffff;background:{{ item.state == 'slow' ? '#d97706' : '#dc2626' }};">{{ item.label }}{{ item.reminder ? ' · still' : '' }}</span><br>
+          <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;color:#ffffff;background:{{ item.warning ? '#d97706' : '#dc2626' }};">{{ item.label }}{{ item.reminder ? ' · still' : '' }}</span><br>
           <span class="cg-code">{{ item.command }}</span><br>
           <span style="color:#52606d;">{{ item.message|ucfirst }}.{% if item.lastOkAgo %} Last ran fine {{ item.lastOkAgo }} ago.{% endif %}</span>
+          {% if item.log|length %}<br><span style="display:block;margin-top:8px;padding:8px 10px;border-radius:6px;background:#f5f7f7;color:#3e4c59;font-size:13px;"><strong style="font-weight:600;">Logged</strong>{% for line in item.log %}<br><span class="cg-code" style="word-break:break-word;">{{ line }}</span>{% endfor %}</span>{% endif %}
         </mj-text>
         <mj-raw>{% endfor %}</mj-raw>
         <mj-raw>{% for item in recovered %}</mj-raw>

@@ -8,7 +8,7 @@ Most Craft sites have a few commands on a timer: `queue/run` every minute, a nig
 
 - **Records every run:** when it started, how long it took, how much memory it used, and how it ended, including the error message of an exception.
 - **Learns each schedule** from the runs themselves. There's nothing to configure.
-- **Reports four kinds of problem:** a command that **failed**, **missed** its usual time, is **stuck**, or ran **slow**. When everything is late at once, it tells you **cron has stopped**.
+- **Reports six kinds of problem:** a command that **failed** (with what it logged), **missed** its usual time, is **stuck**, is **overlapping** itself, ran **slow**, or is near its **memory** limit. When everything is late at once, it tells you **cron has stopped**.
 - **Sends one alert per problem** by email, to Slack, Discord or Microsoft Teams, or to a webhook, and tells you when it's back to normal.
 - **Shows it all** under **Utilities → Cron Guard**, with a count of problems on the Utilities menu.
 - **Answers uptime monitors** on a health URL.

@@ -25,7 +25,11 @@ You can also [set a schedule](../getting-started/configuration#when-to-set-a-sch
 | **Failed** | The last run ended with a non-zero exit code or an exception, or was stopped before it finished. |
 | **Missed** | It hasn't started for longer than its schedule (or its longest usual gap) plus some slack: half the interval, at least 5 minutes and at most 2 hours. A command that runs every 5 minutes is missed after 10, a daily one after 26 hours. A command that's running right now is never missed. |
 | **Stuck** | A run started more than 60 minutes ago (`stuckMinutes`), or five times its usual time if that's longer, and hasn't finished. |
+| **Overlapping** | Two or more runs of the command have been going for a minute or more at once: each run takes longer than the time between them, so they pile up. Runs on other servers count until they finish or are closed as stopped. `queue/run` is left out, as Craft runs several side by side (`allowOverlap`). |
 | **Slow** | The last run took three times its usual time, and over a minute longer. Needs five runs to compare with. |
+| **Memory** | The last run used 85% or more of PHP's memory limit (`memoryWarnPercent`), so it's close to being killed for running out. Where PHP on the command line has no limit, as it often doesn't, there's nothing to warn about. |
+
+A failed run keeps the errors and warnings Craft logged while it ran, the last 20. They're on its command's page, and the last few errors are in the alert.
 
 When every command with a schedule is missed at once, the alert says **cron isn't running** rather than listing each one.
 

@@ -44,7 +44,10 @@ class Install extends Migration
             // Null while running, and for a run killed before it could finish.
             'exitCode' => $this->smallInteger(),
             'error' => $this->text(),
+            // The errors and warnings logged during a failed run, as JSON.
+            'log' => $this->text(),
             'memory' => $this->bigInteger(),
+            'memoryLimit' => $this->bigInteger(),
             // The process and server running it, to tell a run still going from one that was killed.
             'pid' => $this->integer(),
             'host' => $this->string(255),
