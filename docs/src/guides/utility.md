@@ -23,6 +23,10 @@ Click a command to see its last 100 runs: when each started, how long it took, h
 - **Mute** stops alerts for the command while it's still recorded, such as while you fix it, or for one you don't care about.
 - **Forget** removes the command and its runs. It comes back the next time it runs, which is useful after renaming one.
 
+## Dashboard widget
+
+Add the **Cron Guard** widget to the dashboard to see, without opening the utility, whether every command is running as it should. When one isn't, it lists the commands that need a look with what's wrong, each linked to its runs. It also says when cron itself has most likely stopped, how many commands are watched and when one last ran.
+
 ## Who can see it
 
-Anyone with permission to use the Cron Guard utility (**Utilities → Cron Guard** under a user group's permissions) can see the page and use its buttons. Sending a test alert needs an admin.
+Anyone with permission to use the Cron Guard utility (**Utilities → Cron Guard** under a user group's permissions) can see the page, use its buttons and add the dashboard widget. Sending a test alert needs an admin.

@@ -1,5 +1,14 @@
 # Release Notes for Cron Guard
 
+## Unreleased
+
+### Added
+- A **Cron Guard** dashboard widget: whether every command is running as it should, the ones that need a look with what’s wrong, and when cron itself has most likely stopped. It’s there for people who can use the Cron Guard utility.
+
+### Fixed
+- A command that failed within an hour of a slow-run alert wasn’t reported until a day later, as if it were flapping. It’s now sent straight away.
+- A command’s usual run time left out one of its runs after a run was killed, so its stuck time and the slow-run check could be off.
+
 ## 1.0.2 - 2026-11-22
 
 ### Fixed

@@ -1,0 +1,58 @@
+{% set labels = {
+	failing: ['red', 'Failed'|t('cron-guard')],
+	stuck: ['red', 'Stuck'|t('cron-guard')],
+	overdue: ['red', 'Missed'|t('cron-guard')],
+	slow: ['orange', 'Slow'|t('cron-guard')],
+} %}
+
+<div class="cron-guard-widget">
+	{% if not statuses|length %}
+		<p class="light">{{ 'No scheduled commands recorded yet. They appear here after cron first runs one.'|t('cron-guard') }}</p>
+	{% else %}
+		{% if stopped %}
+			<p class="cron-guard-widget-banner">
+				<strong>{{ 'No command has run for {time}.'|t('cron-guard', { time: checker.duration(now - lastAny) }) }}</strong>
+				{{ 'Cron itself has most likely stopped.'|t('cron-guard') }}
+			</p>
+		{% endif %}
+
+		<p class="cron-guard-widget-head {{ problems|length ? 'error' : 'success' }}">
+			{% if problems|length %}
+				{{ '{count, plural, =1{One command needs a look.} other{# commands need a look.}}'|t('cron-guard', { count: problems|length }) }}
+			{% else %}
+				{{ 'Every command is running as it should.'|t('cron-guard') }}
+			{% endif %}
+		</p>
+
+		{% if problems|length %}
+			<ul class="cron-guard-widget-list">
+				{% for status in problems %}
+					{% set label = labels[status.state] %}
+					<li>
+						<a href="{{ cpUrl('utilities/cron-guard', { command: status.id }) }}"><code>{{ status.command }}</code></a>
+						<span class="cron-guard-widget-state"><span class="status {{ label[0] }}" aria-hidden="true"></span>{{ label[1] }}</span>
+						{% if status.message %}<div class="smalltext light">{{ status.message|ucfirst }}.</div>{% endif %}
+					</li>
+				{% endfor %}
+			</ul>
+		{% endif %}
+
+		<p class="smalltext light cron-guard-widget-foot">
+			{{ '{count, plural, =1{One command watched} other{# commands watched}}'|t('cron-guard', { count: statuses|length }) }}
+			{%- if lastAny %} · {{ 'last run {time} ago'|t('cron-guard', { time: checker.duration(now - lastAny) }) }}{% endif %}
+			· <a href="{{ cpUrl('utilities/cron-guard') }}">{{ 'All commands'|t('cron-guard') }}</a>
+		</p>
+	{% endif %}
+</div>
+
+{% css %}
+.cron-guard-widget-head { margin: 0 0 10px; font-weight: 600; }
+.cron-guard-widget-list { margin: 0 0 10px; padding: 0; list-style: none; }
+.cron-guard-widget-list li { padding: 8px 0; border-top: 1px solid var(--hairline-color, rgba(51, 64, 77, 0.1)); }
+.cron-guard-widget-list li:last-child { border-bottom: 1px solid var(--hairline-color, rgba(51, 64, 77, 0.1)); }
+.cron-guard-widget-list code { word-break: break-all; }
+.cron-guard-widget-state { white-space: nowrap; margin-inline-start: 6px; }
+.cron-guard-widget-state .status { margin-inline-end: 6px; }
+.cron-guard-widget-banner { padding: 8px 12px; margin: 0 0 10px; border-radius: var(--large-border-radius, 5px); background: var(--red-050, #fef2f2); color: var(--red-800, #991b1b); }
+.cron-guard-widget-foot { margin: 0; }
+{% endcss %}

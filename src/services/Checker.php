@@ -93,8 +93,9 @@ class Checker extends Component
         if ($interval === null && ($schedule = $this->learntSchedule($starts))) {
             [$interval, $longestGap] = $schedule;
         }
-        // The usual duration leaves out the newest run, so a slow one is compared with the ones before it.
-        $usualDuration = $this->median(array_slice($durations, $lastFinished === $last ? 1 : 0));
+        // The usual duration leaves out the newest run, so a slow one is compared with the ones before it. A newest
+        // run without a duration (running, or killed) isn’t in it already.
+        $usualDuration = $this->median(array_slice($durations, $last !== null && $last['durationMs'] !== null ? 1 : 0));
 
         $status = [
             'id' => (int)$command['id'],
@@ -206,8 +207,11 @@ class Checker extends Component
                     if (!$quiet && $wasState !== self::SLOW) {
                         $recovered[] = $status;
                         $changes[$status['id']] = [null, $now, true];
-                    } else {
+                    } elseif ($quiet) {
                         $changes[$status['id']] = [null, $lastAlert, false];
+                    } else {
+                        // Nothing was reported fixed, so a failure next isn’t flapping: it’s sent.
+                        $changes[$status['id']] = [null, null, false];
                     }
                 }
             }

@@ -36,7 +36,7 @@ Then go to **Settings → Plugins → Cron Guard** and add where alerts go. **Se
 
 ## Where to see it
 
-**Utilities → Cron Guard** lists every command with its status, schedule, last run and usual run time, and the Utilities menu shows how many need a look. Click a command to see its last 100 runs, or to mute or forget it.
+**Utilities → Cron Guard** lists every command with its status, schedule, last run and usual run time, and the Utilities menu shows how many need a look. Click a command to see its last 100 runs, or to mute or forget it. The **Cron Guard** dashboard widget shows the same at a glance: whether everything's fine, and the commands that need a look.
 
 From the command line:
 

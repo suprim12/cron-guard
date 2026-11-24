@@ -14,12 +14,14 @@ use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\console\Application as ConsoleApplication;
 use craft\events\RegisterComponentTypesEvent;
+use craft\services\Dashboard;
 use craft\services\Utilities;
 use suprim\cronguard\models\Settings;
 use suprim\cronguard\services\Alerts;
 use suprim\cronguard\services\Checker;
 use suprim\cronguard\services\Runs;
 use suprim\cronguard\utilities\CronGuardUtility;
+use suprim\cronguard\widgets\CronGuardWidget;
 use yii\base\ActionEvent;
 use yii\base\Application;
 use yii\base\Event;
@@ -55,6 +57,9 @@ class Plugin extends BasePlugin
 
         Event::on(Utilities::class, Utilities::EVENT_REGISTER_UTILITIES, function(RegisterComponentTypesEvent $event) {
             $event->types[] = CronGuardUtility::class;
+        });
+        Event::on(Dashboard::class, Dashboard::EVENT_REGISTER_WIDGET_TYPES, function(RegisterComponentTypesEvent $event) {
+            $event->types[] = CronGuardWidget::class;
         });
 
         $app = Craft::$app;
