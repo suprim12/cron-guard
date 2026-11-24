@@ -4,10 +4,14 @@
 
 ### Added
 - A **Cron Guard** dashboard widget: whether every command is running as it should, the ones that need a look with what’s wrong, and when cron itself has most likely stopped. It’s there for people who can use the Cron Guard utility.
+- Mute a command for an hour, a day or a week, as well as until you turn it off. It’s watched again on its own when the time is up, and a problem still there is sent then.
 
 ### Fixed
 - A command that failed within an hour of a slow-run alert wasn’t reported until a day later, as if it were flapping. It’s now sent straight away.
 - A command’s usual run time left out one of its runs after a run was killed, so its stuck time and the slow-run check could be off.
+- Each piece of code run with `php craft exec` was listed as a command of its own, such as `exec echo 1;`. `exec` is no longer watched, and the ones recorded are removed.
+- A long run still going showed as “Didn’t finish” on its command’s page once a newer run had started. It now reads “Running, or stopped before it finished”, as the newest does.
+- `cron-guard/check/status` showed a muted command that hadn’t had four runs yet as irregular, rather than learning.
 
 ## 1.0.2 - 2026-11-22
 

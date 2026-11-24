@@ -64,6 +64,7 @@
 							<th scope="row"><a href="{{ cpUrl('utilities/cron-guard', { command: status.id }) }}"><code>{{ status.command }}</code></a></th>
 							<td>
 								{{ m.state(status, runsToLearn) }}
+								{% if status.mutedUntil %}<div class="smalltext light">{{ 'Until {date}'|t('cron-guard', { date: status.mutedUntil|datetime('short') }) }}</div>{% endif %}
 								{% if status.message %}<div class="smalltext light">{{ status.message }}</div>{% endif %}
 							</td>
 							<td>

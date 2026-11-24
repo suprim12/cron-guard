@@ -30,6 +30,8 @@ cron-guard/*
 
 `queue/listen` is left out because it runs forever rather than on a schedule. `queue/run` is watched.
 
+Two commands are never watched, whatever the list says: `queue/exec`, the process `queue/run` starts for each job (its time counts in its `queue/run`), and `exec`, which runs a piece of PHP typed after it.
+
 ## Names and arguments
 
 Commands are named as they're typed: `gc`, not `gc/run`. Arguments that change what a command does are part of its name, so each of these has its own schedule:

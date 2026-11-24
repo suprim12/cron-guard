@@ -101,7 +101,8 @@ class Checker extends Component
             'id' => (int)$command['id'],
             'command' => $command['command'],
             'route' => $command['route'],
-            'muted' => (bool)$command['muted'],
+            'muted' => $this->isMuted($command, $now),
+            'mutedUntil' => $this->mutedUntil($command, $now),
             'alertState' => $command['alertState'],
             'alertedAt' => $command['alertedAt'],
             'interval' => $interval,
@@ -173,6 +174,7 @@ class Checker extends Component
 
         try {
             $settings = Plugin::getInstance()->getSettings();
+            $this->endMutes($now);
             $this->closeAbandoned($now);
             $statuses = $this->statuses($now);
             $problems = [];
@@ -440,6 +442,50 @@ class Checker extends Component
         }
 
         return null;
+    }
+
+    /**
+     * Whether a command is muted now: muted until it’s turned off, or for a while that hasn’t ended.
+     *
+     * @param array<string, mixed> $command
+     */
+    public function isMuted(array $command, int $now): bool
+    {
+        if (!$command['muted']) {
+            return false;
+        }
+        $until = $command['mutedUntil'] ?? null;
+
+        return $until === null || $this->timestamp($until) > $now;
+    }
+
+    /**
+     * When a mute for a while ends, while it hasn’t yet.
+     *
+     * @param array<string, mixed> $command
+     */
+    private function mutedUntil(array $command, int $now): ?int
+    {
+        $until = $command['mutedUntil'] ?? null;
+
+        return $command['muted'] && $until !== null && $this->timestamp($until) > $now ? $this->timestamp($until) : null;
+    }
+
+    /**
+     * Turns off mutes whose time is up, so their commands are watched again, and pruned like any other.
+     */
+    public function endMutes(int $now): void
+    {
+        try {
+            Db::update(Runs::TABLE_COMMANDS, ['muted' => false, 'mutedUntil' => null, 'alertState' => null, 'alertedAt' => null], [
+                'and',
+                ['muted' => true],
+                ['not', ['mutedUntil' => null]],
+                ['<=', 'mutedUntil', Db::prepareDateForDb(new DateTime("@$now"))],
+            ]);
+        } catch (Throwable) {
+            // Not until the 1.1.0 migration has run.
+        }
     }
 
     private function remember(int $commandId, ?string $state, ?int $at): void

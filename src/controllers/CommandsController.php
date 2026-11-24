@@ -12,6 +12,7 @@ namespace suprim\cronguard\controllers;
 use Craft;
 use craft\helpers\Db;
 use craft\web\Controller;
+use DateTime;
 use suprim\cronguard\Plugin;
 use suprim\cronguard\services\Runs;
 use yii\web\Response;
@@ -21,6 +22,9 @@ use yii\web\Response;
  */
 class CommandsController extends Controller
 {
+    /** How long Mute can be for, other than until it’s turned off. */
+    private const MUTE_FOR = ['hour' => '1 hour', 'day' => '1 day', 'week' => '1 week'];
+
     public function beforeAction($action): bool
     {
         if (!parent::beforeAction($action)) {
@@ -49,9 +53,20 @@ class CommandsController extends Controller
     public function actionMute(): Response
     {
         $muted = (bool)$this->request->getRequiredBodyParam('muted');
-        Db::update(Runs::TABLE_COMMANDS, ['muted' => $muted, 'alertState' => null, 'alertedAt' => null], ['id' => $this->request->getRequiredBodyParam('id')]);
+        // For a while (`hour`, `day`, `week`), or until it’s turned off.
+        $for = $muted ? (self::MUTE_FOR[(string)$this->request->getBodyParam('for', '')] ?? null) : null;
+        $until = $for !== null ? new DateTime("+$for") : null;
+        $values = ['muted' => $muted, 'alertState' => null, 'alertedAt' => null];
+        if (Craft::$app->getDb()->columnExists(Runs::TABLE_COMMANDS, 'mutedUntil')) {
+            $values['mutedUntil'] = $until !== null ? Db::prepareDateForDb($until) : null;
+        }
+        Db::update(Runs::TABLE_COMMANDS, $values, ['id' => $this->request->getRequiredBodyParam('id')]);
         Craft::$app->getCache()->delete('cron-guard:badge');
-        $this->setSuccessFlash($muted ? Craft::t('cron-guard', 'Command muted.') : Craft::t('cron-guard', 'Command watched again.'));
+        $this->setSuccessFlash(match (true) {
+            !$muted => Craft::t('cron-guard', 'Command watched again.'),
+            $until !== null => Craft::t('cron-guard', 'Command muted until {date}.', ['date' => Craft::$app->getFormatter()->asDatetime($until, 'short')]),
+            default => Craft::t('cron-guard', 'Command muted.'),
+        });
 
         return $this->redirectToPostedUrl();
     }

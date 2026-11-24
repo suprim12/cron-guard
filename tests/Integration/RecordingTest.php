@@ -65,11 +65,39 @@ class RecordingTest extends TestCase
 
     public function testExitCodeFromEnd(): void
     {
-        // A command ending with Craft::$app->end(4).
-        $name = 'exec Craft::$app->end(4);';
+        // A command ending with Craft::$app->end(4), run as `php craft` runs it, with a controller only this test has
+        // (`exec` would do, but isn’t watched).
+        $name = 'cron-guard-test/end';
         $this->names[] = $name;
-        $this->assertSame(4, $this->craft("exec 'Craft::\$app->end(4);'"));
+        $script = CRON_GUARD_PROJECT_ROOT . '/storage/runtime/cron-guard-test-end.php';
+        file_put_contents($script, '<?php
+$_SERVER["argv"] = ["craft", "cron-guard-test/end"];
+$_SERVER["argc"] = 2;
+require ' . var_export(CRON_GUARD_PROJECT_ROOT . '/bootstrap.php', true) . ';
+$app = require CRAFT_VENDOR_PATH . "/craftcms/cms/bootstrap/console.php";
+class CronGuardTestEndController extends craft\\console\\Controller
+{
+    public function actionEnd(): int
+    {
+        Craft::$app->end(4);
+    }
+}
+$app->controllerMap["cron-guard-test"] = CronGuardTestEndController::class;
+exit($app->run());
+');
+        try {
+            $process = proc_open(['php', $script], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, CRON_GUARD_PROJECT_ROOT);
+            $this->assertSame(4, proc_close($process));
+        } finally {
+            @unlink($script);
+        }
         $this->assertSame(4, (int)$this->lastRun($name)['exitCode']);
+    }
+
+    public function testExecIsntRecorded(): void
+    {
+        $this->assertSame(0, $this->craft("exec 'echo 1;'"));
+        $this->assertFalse((new Query())->from(Runs::TABLE_COMMANDS)->where(['command' => 'exec echo 1;'])->exists());
     }
 
     public function testDefaultActionsAreNamedAsTyped(): void

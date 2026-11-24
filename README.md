@@ -54,6 +54,7 @@ A command that fails is reported as it ends. Missed and stuck commands are found
 
 - Commands typed in a terminal. Cron runs commands without one, so testing by hand never adds noise.
 - Deploy and setup commands: `up`, `migrate/*`, `project-config/*`, `plugin/*`, `install/*`, `setup/*`, `clear-caches/*`, `cache/*`, `on`, `off`, `help` and `queue/listen`. Change the list under **Don't watch** on the settings page.
+- `queue/exec`, the process each queue job runs in, and `exec`, which runs a piece of PHP: never watched.
 
 Commands with different arguments are watched separately, so `resave/entries --section=news` and `resave/entries --section=events` each have their own schedule.
 

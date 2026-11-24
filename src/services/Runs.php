@@ -31,9 +31,10 @@ class Runs extends Component
 
     /**
      * Commands never watched, whatever the settings say: the process `queue/run` starts for each job (Yii’s queue
-     * isolates jobs), named by the job’s ID, so each job would be a command of its own. Its time is the run’s.
+     * isolates jobs), named by the job’s ID, so each job would be a command of its own. Its time is the run’s. And
+     * `exec`, which runs a piece of PHP typed after it, so each piece would be a command of its own.
      */
-    public const NEVER_WATCHED = ['queue/exec'];
+    public const NEVER_WATCHED = ['queue/exec', 'exec'];
 
     /** The exit code of a run that never finished: the process was killed, or the server restarted. */
     public const EXIT_ABANDONED = -1;

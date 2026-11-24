@@ -56,9 +56,9 @@ class CheckController extends Controller
         }
         $rows = array_map(fn($s) => [
             $s['command'],
-            $s['interval'] !== null ? $checker->every($s['interval']) : ($s['state'] === Checker::LEARNING ? "learning ({$s['runs']} of " . Checker::RUNS_TO_LEARN . ')' : 'irregular'),
+            $s['interval'] !== null ? $checker->every($s['interval']) : ($s['runs'] < Checker::RUNS_TO_LEARN ? "learning ({$s['runs']} of " . Checker::RUNS_TO_LEARN . ')' : 'irregular'),
             $s['lastStart'] ? $checker->duration(time() - $s['lastStart']) . ' ago' : '',
-            $s['state'] . ($s['message'] ? ": {$s['message']}" : ''),
+            $s['state'] . ($s['mutedUntil'] ? ' until ' . date('Y-m-d H:i', $s['mutedUntil']) : '') . ($s['message'] ? ": {$s['message']}" : ''),
         ], $statuses);
         $this->table(['Command', 'Runs', 'Last run', 'Status'], $rows);
         $problems = array_filter($statuses, fn($s) => in_array($s['state'], Checker::PROBLEMS, true));

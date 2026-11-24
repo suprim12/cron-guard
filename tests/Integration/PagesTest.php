@@ -64,6 +64,25 @@ class PagesTest extends TestCase
         $this->assertGreaterThanOrEqual(1, CronGuardUtility::badgeCount());
     }
 
+    public function testCommandPageOffersHowLong(): void
+    {
+        if (!Craft::$app->getDb()->columnExists(\suprim\cronguard\services\Runs::TABLE_COMMANDS, 'mutedUntil')) {
+            $this->markTestSkipped('Run the 1.1.0 migration first.');
+        }
+        $runs = $this->every(300, 5);
+        $runs[0]['exitCode'] = 1;
+        $id = $this->command($runs);
+        $html = CronGuardUtility::html($id);
+        $this->assertStringContainsString('name="for"', $html);
+        $this->assertStringContainsString('For a day', $html);
+
+        \craft\helpers\Db::update(\suprim\cronguard\services\Runs::TABLE_COMMANDS, ['muted' => true, 'mutedUntil' => \craft\helpers\Db::prepareDateForDb(new \DateTime('+1 day'))], ['id' => $id]);
+        $html = CronGuardUtility::html($id);
+        $this->assertStringContainsString('Muted until', $html);
+        $this->assertStringContainsString('Watch again', $html);
+        $this->assertStringNotContainsString('name="for"', $html);
+    }
+
     public function testSettingsPage(): void
     {
         $method = new \ReflectionMethod($this->plugin(), 'settingsHtml');

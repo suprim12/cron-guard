@@ -24,6 +24,8 @@ class Install extends Migration
             'command' => $this->string(255)->notNull(),
             'route' => $this->string(255)->notNull(),
             'muted' => $this->boolean()->notNull()->defaultValue(false),
+            // When a mute for a while ends; null while muted until it’s turned off.
+            'mutedUntil' => $this->dateTime(),
             // The problem last alerted, so it’s sent once, and “recovered” when it goes away.
             'alertState' => $this->string(20),
             'alertedAt' => $this->dateTime(),

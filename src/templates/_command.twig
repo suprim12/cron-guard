@@ -2,6 +2,9 @@
 	<p><a href="{{ cpUrl('utilities/cron-guard') }}">← {{ 'All commands'|t('cron-guard') }}</a></p>
 	<h2><code>{{ status.command }}</code></h2>
 	<p>
+		{% if status.muted %}
+			<strong>{{ status.mutedUntil ? 'Muted until {date}.'|t('cron-guard', { date: status.mutedUntil|datetime('short') }) : 'Muted.'|t('cron-guard') }}</strong>
+		{% endif %}
 		{% if status.message %}<strong>{{ status.message|ucfirst }}.</strong>{% endif %}
 		{% if status.interval %}
 			{{ 'Runs {every}.'|t('cron-guard', { every: checker.every(status.interval) }) }}
@@ -12,9 +15,19 @@
 	</p>
 
 	<div class="flex" style="margin-bottom: 1.5rem;">
-		<form method="post">
+		<form method="post" class="flex">
 			{{ csrfInput() }}{{ actionInput('cron-guard/commands/mute') }}{{ redirectInput('utilities/cron-guard?command=' ~ status.id) }}
 			{{ hiddenInput('id', status.id) }}{{ hiddenInput('muted', status.muted ? 0 : 1) }}
+			{% if not status.muted %}
+				<div class="select">
+					<select name="for" aria-label="{{ 'Mute for'|t('cron-guard') }}">
+						<option value="hour">{{ 'For an hour'|t('cron-guard') }}</option>
+						<option value="day">{{ 'For a day'|t('cron-guard') }}</option>
+						<option value="week">{{ 'For a week'|t('cron-guard') }}</option>
+						<option value="">{{ 'Until I turn it off'|t('cron-guard') }}</option>
+					</select>
+				</div>
+			{% endif %}
 			<button type="submit" class="btn">{{ status.muted ? 'Watch again'|t('cron-guard') : 'Mute'|t('cron-guard') }}</button>
 		</form>
 		<form method="post" onsubmit="return confirm({{ 'Forget this command and its runs? It comes back the next time it runs.'|t('cron-guard')|json_encode }})">
@@ -41,7 +54,7 @@
 						<td>{{ run.durationMs is not null ? checker.duration(run.durationMs / 1000) : '' }}</td>
 						<td>
 							{% if run.exitCode is null %}
-								<span class="cron-guard-state"><span class="status orange" aria-hidden="true"></span>{{ loop.first ? 'Running, or stopped before it finished'|t('cron-guard') : 'Didn’t finish'|t('cron-guard') }}</span>
+								<span class="cron-guard-state"><span class="status orange" aria-hidden="true"></span>{{ 'Running, or stopped before it finished'|t('cron-guard') }}</span>
 							{% elseif run.exitCode == -1 %}
 								<span class="cron-guard-state"><span class="status red" aria-hidden="true"></span>{{ 'Stopped before it finished'|t('cron-guard') }}</span>
 								<div class="smalltext light">{{ 'Killed for using too much memory or time, or the server restarted.'|t('cron-guard') }}</div>

@@ -20,7 +20,7 @@ Click a command to see its last 100 runs: when each started, how long it took, h
 
 ![A command's runs: the latest failed with a timeout, the ones before ran fine](/images/command.jpg)
 
-- **Mute** stops alerts for the command while it's still recorded, such as while you fix it, or for one you don't care about.
+- **Mute** stops alerts for the command while it's still recorded, such as while you fix it, or for one you don't care about. Mute it for an hour, a day or a week, and it's watched again on its own afterwards, or until you turn it off with **Watch again**. A problem still there when a mute ends is sent then.
 - **Forget** removes the command and its runs. It comes back the next time it runs, which is useful after renaming one.
 
 ## Dashboard widget
