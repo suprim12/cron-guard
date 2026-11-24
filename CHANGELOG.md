@@ -14,6 +14,7 @@
 - A command’s usual run time left out one of its runs after a run was killed, so its stuck time and the slow-run check could be off.
 - Each piece of code run with `php craft exec` was listed as a command of its own, such as `exec echo 1;`. `exec` is no longer watched, and the ones recorded are removed.
 - A long run still going showed as “Didn’t finish” on its command’s page once a newer run had started. It now reads “Running, or stopped before it finished”, as the newest does.
+- An error message with `<!channel>` or `@everyone` in it, such as one quoting a feed’s data, could ping a whole Slack or Discord channel, or add a link to a Slack alert. They’re now shown as text.
 - `cron-guard/check/status` showed a muted command that hadn’t had four runs yet as irregular, rather than learning.
 
 ## 1.0.2 - 2026-11-22
