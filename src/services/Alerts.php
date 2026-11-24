@@ -283,7 +283,8 @@ class Alerts extends Component
         $message = "*{$event->subject}*\n{$event->text}";
         $host = (string)parse_url($url, PHP_URL_HOST);
         if (str_ends_with($host, 'discord.com') || str_ends_with($host, 'discordapp.com')) {
-            return ['content' => mb_substr(str_replace('*', '**', $message), 0, 2000)];
+            // Error and log messages are the site’s data: an @everyone in one mustn’t ping the channel.
+            return ['content' => mb_substr(str_replace('*', '**', $message), 0, 2000), 'allowed_mentions' => ['parse' => []]];
         }
         if (str_ends_with($host, '.logic.azure.com') || str_ends_with($host, '.powerplatform.com') || str_ends_with($host, '.powerautomate.com')) {
             return [
@@ -307,7 +308,14 @@ class Alerts extends Component
             ];
         }
 
-        return ['text' => $message];
+        // Slack reads <!channel>, <@user> and <url|text> in text, so an error or log message could ping the channel or
+        // add a link: &, < and > are escaped, as Slack asks.
+        return ['text' => '*' . $this->slackEscape($event->subject) . "*\n" . $this->slackEscape($event->text)];
+    }
+
+    private function slackEscape(string $text): string
+    {
+        return str_replace(['&', '<', '>'], ['&amp;', '&lt;', '&gt;'], $text);
     }
 
     /**

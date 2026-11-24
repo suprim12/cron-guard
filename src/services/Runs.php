@@ -163,7 +163,7 @@ class Runs extends Component
                 $log = $this->finishLog();
                 // Only a failed run keeps what was logged; one that ran fine doesn’t need it.
                 if ($exitCode !== 0 && $log) {
-                    $values['log'] = json_encode($log, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+                    $values['log'] = RunLogTarget::encode($log);
                 }
             }
             Db::update(self::TABLE_RUNS, $values, ['id' => $current['runId']]);

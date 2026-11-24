@@ -139,6 +139,22 @@ class WarningsTest extends TestCase
         $this->assertStringContainsString('Element 4512 failed validation', $html);
     }
 
+    public function testALongLogStillFitsItsColumn(): void
+    {
+        // 20 messages of 1,000 characters, four bytes each: 80 KB, over MySQL’s 64 KB for a text column.
+        $entries = array_fill(0, 20, ['level' => 'error', 'category' => 'feed', 'message' => str_repeat('😀', 1000)]);
+        $json = \suprim\cronguard\log\RunLogTarget::encode($entries);
+        $this->assertLessThanOrEqual(\suprim\cronguard\log\RunLogTarget::MAX_BYTES, strlen($json));
+        $decoded = json_decode($json, true);
+        $this->assertIsArray($decoded);
+        $this->assertNotEmpty($decoded, 'The latest are kept.');
+
+        // One message too long on its own is cut, still valid UTF-8.
+        $one = \suprim\cronguard\log\RunLogTarget::encode([['level' => 'error', 'category' => 'x', 'message' => str_repeat('😀', 9000)]]);
+        $this->assertLessThanOrEqual(\suprim\cronguard\log\RunLogTarget::MAX_BYTES, strlen($one));
+        $this->assertIsArray(json_decode($one, true));
+    }
+
     public function testSlowStaysSlowWhileTheNextRunRuns(): void
     {
         $runs = $this->every(3600, 7, 10, 20);

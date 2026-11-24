@@ -27,6 +27,9 @@ class RunLogTarget extends Target
     /** Characters kept of each message. */
     public const MESSAGE_LENGTH = 1000;
 
+    /** Bytes a run’s log may take once saved, well inside MySQL’s 64 KB for a text column. */
+    public const MAX_BYTES = 16384;
+
     /** @var array<int, array{level: string, category: string, message: string}> */
     private array $entries = [];
 
@@ -70,6 +73,28 @@ class RunLogTarget extends Target
     public function entries(): array
     {
         return $this->entries;
+    }
+
+    /**
+     * The entries as JSON, the oldest left out until it fits in MAX_BYTES, so a run with long messages in a script
+     * that takes several bytes a character can still be saved.
+     *
+     * @param array<int, array{level: string, category: string, message: string}> $entries
+     */
+    public static function encode(array $entries): string
+    {
+        $flags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE;
+        $json = (string)json_encode($entries, $flags);
+        while (strlen($json) > self::MAX_BYTES && count($entries) > 1) {
+            array_shift($entries);
+            $json = (string)json_encode($entries, $flags);
+        }
+        if (strlen($json) > self::MAX_BYTES) {
+            $entries[0]['message'] = mb_strcut($entries[0]['message'], 0, self::MAX_BYTES / 2, 'UTF-8') . '…';
+            $json = (string)json_encode($entries, $flags);
+        }
+
+        return $json;
     }
 
     private function text(mixed $message): string

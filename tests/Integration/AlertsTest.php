@@ -142,12 +142,14 @@ class AlertsTest extends TestCase
         try {
             $runs = $this->every(300, 5);
             $runs[0]['exitCode'] = 1;
+            $runs[0]['error'] = 'Feed said <!channel> & <https://evil.example|click>';
             $id = $this->command($runs);
             $this->plugin()->checker->check([$id]);
 
             $this->assertCount(2, $requests);
             $slack = json_decode((string)$requests[0]['request']->getBody(), true);
             $this->assertStringContainsString('failed on', $slack['text']);
+            $this->assertStringContainsString('Feed said &lt;!channel&gt; &amp; &lt;https://evil.example|click&gt;', $slack['text'], 'Can’t ping the channel or add a link.');
             $hook = json_decode((string)$requests[1]['request']->getBody(), true);
             $this->assertSame('failing', $hook['problems'][0]['state']);
             $this->assertSame(300, $hook['problems'][0]['intervalSeconds']);
@@ -156,7 +158,9 @@ class AlertsTest extends TestCase
             // Discord reads content, and a channel that answers with an error is reported.
             $settings->chatWebhook = 'https://discord.com/api/webhooks/1/x';
             $results = $alerts->sendTest();
-            $this->assertArrayHasKey('content', json_decode((string)$requests[2]['request']->getBody(), true));
+            $discord = json_decode((string)$requests[2]['request']->getBody(), true);
+            $this->assertArrayHasKey('content', $discord);
+            $this->assertSame(['parse' => []], $discord['allowed_mentions'], 'Can’t ping @everyone.');
             $this->assertNotTrue($results['Chat']);
             $this->assertTrue($results['Webhook']);
 
