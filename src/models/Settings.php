@@ -83,6 +83,34 @@ class Settings extends Model
     public string $emailTemplate = '';
 
     /**
+     * The ignore list is split into its lines. Craft’s settings page sets it as the textarea’s text, which Craft makes
+     * a list of one; lists saved that way before are split too.
+     */
+    public function setAttributes($values, $safeOnly = true): void
+    {
+        parent::setAttributes($values, $safeOnly);
+        $this->ignore = self::lines($this->ignore);
+    }
+
+    /**
+     * @param string[]|string $value
+     * @return string[]
+     */
+    public static function lines(array|string $value): array
+    {
+        $lines = [];
+        foreach ((array)$value as $item) {
+            foreach (preg_split('/\R/', (string)$item) as $line) {
+                if (($line = trim($line)) !== '') {
+                    $lines[] = $line;
+                }
+            }
+        }
+
+        return array_values(array_unique($lines));
+    }
+
+    /**
      * @return string[]
      */
     public function emailList(): array

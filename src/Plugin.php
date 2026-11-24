@@ -81,17 +81,6 @@ class Plugin extends BasePlugin
         return new Settings();
     }
 
-    /**
-     * The ignore list comes from the settings page as text, one a line.
-     */
-    public function setSettings(array $settings): void
-    {
-        if (isset($settings['ignore']) && is_string($settings['ignore'])) {
-            $settings['ignore'] = array_values(array_filter(array_map('trim', preg_split('/\R/', $settings['ignore']))));
-        }
-        parent::setSettings($settings);
-    }
-
     protected function settingsHtml(): ?string
     {
         return Craft::$app->getView()->renderTemplate('cron-guard/_settings', [

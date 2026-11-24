@@ -171,4 +171,17 @@ class AlertsTest extends TestCase
             $alerts->httpHandler = null;
         }
     }
+
+    public function testDontWatchFromTheSettingsPage(): void
+    {
+        // As Craft’s settings page saves it: the textarea’s text, which Craft makes a list of one.
+        $settings = new \suprim\cronguard\models\Settings();
+        $settings->setAttributes(['ignore' => "help\r\nmigrate/*\r\n\r\n  cron-guard/*  "], false);
+        $this->assertSame(['help', 'migrate/*', 'cron-guard/*'], $settings->ignore);
+
+        // As 1.0 stored it after that save: one item with every line in it.
+        $settings->setAttributes(['ignore' => ["help\r\nup\r\nplugin/*"]], false);
+        $this->assertSame(['help', 'up', 'plugin/*'], $settings->ignore);
+        $this->assertTrue($this->plugin()->runs->isIgnored(['plugin/enable'], $settings->ignore));
+    }
 }
