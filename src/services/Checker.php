@@ -348,6 +348,17 @@ class Checker extends Component
     }
 
     /**
+     * Forgets which problems were sent, so the next check sends every problem there is now. For when alerts first get
+     * somewhere to go: problems found before then only went to the log.
+     */
+    public function resendAll(): void
+    {
+        Db::update(Runs::TABLE_COMMANDS, ['alertState' => null, 'alertedAt' => null], ['not', ['alertState' => null]]);
+        Craft::$app->getCache()->delete('cron-guard:badge');
+        $this->resetDue();
+    }
+
+    /**
      * Forgets when a full check last ran, so the next one isn’t skipped (tests, and Run check now).
      */
     public function resetDue(): void

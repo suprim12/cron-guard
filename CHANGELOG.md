@@ -11,6 +11,8 @@
 - Mute a command for an hour, a day or a week, as well as until you turn it off. It’s watched again on its own when the time is up, and a problem still there is sent then.
 
 ### Fixed
+- Commands on the Don’t watch list, such as `migrate/*` and `plugin/*`, were watched once the settings page had been saved: the list was saved as one line. It’s split into its lines again, including a list already saved that way.
+- Problems found before an email address or webhook was saved only went to the log, and weren’t sent once one was until their reminder a day later. They’re now sent with the next check.
 - A command that failed within an hour of a slow-run alert wasn’t reported until a day later, as if it were flapping. It’s now sent straight away.
 - A command’s usual run time left out one of its runs after a run was killed, so its stuck time and the slow-run check could be off.
 - Each piece of code run with `php craft exec` was listed as a command of its own, such as `exec echo 1;`. `exec` is no longer watched, and the ones recorded are removed.

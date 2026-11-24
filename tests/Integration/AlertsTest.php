@@ -175,4 +175,46 @@ class AlertsTest extends TestCase
             $alerts->httpHandler = null;
         }
     }
+
+    public function testProblemsFoundBeforeAlertsHadSomewhereToGoAreSent(): void
+    {
+        $runs = $this->every(300, 5);
+        $runs[0]['exitCode'] = 1;
+        $id = $this->command($runs);
+        $checker = $this->plugin()->checker;
+        $this->assertNotNull($checker->check([$id]));
+        $this->assertNull($checker->check([$id]), 'Sent, to the log when nothing else was set up.');
+
+        // Saving the first email address, chat or webhook.
+        $checker->resendAll();
+        $alert = $checker->check([$id]);
+        $this->assertNotNull($alert, 'Sent again, now it can go somewhere.');
+        $this->assertFalse($alert['problems'][0]['reminder']);
+    }
+
+    public function testHasChannels(): void
+    {
+        $settings = new \suprim\cronguard\models\Settings();
+        $this->assertFalse($settings->hasChannels());
+        $settings->emails = 'not an address';
+        $this->assertFalse($settings->hasChannels());
+        $settings->emails = 'ops@example.com';
+        $this->assertTrue($settings->hasChannels());
+        $settings->emails = '';
+        $settings->webhookUrl = 'https://example.com/hook';
+        $this->assertTrue($settings->hasChannels());
+    }
+
+    public function testDontWatchFromTheSettingsPage(): void
+    {
+        // As Craft’s settings page saves it: the textarea’s text, which Craft makes a list of one.
+        $settings = new \suprim\cronguard\models\Settings();
+        $settings->setAttributes(['ignore' => "help\r\nmigrate/*\r\n\r\n  cron-guard/*  "], false);
+        $this->assertSame(['help', 'migrate/*', 'cron-guard/*'], $settings->ignore);
+
+        // As 1.0 stored it after that save: one item with every line in it.
+        $settings->setAttributes(['ignore' => ["help\r\nup\r\nplugin/*"]], false);
+        $this->assertSame(['help', 'up', 'plugin/*'], $settings->ignore);
+        $this->assertTrue($this->plugin()->runs->isIgnored(['plugin/enable'], $settings->ignore));
+    }
 }

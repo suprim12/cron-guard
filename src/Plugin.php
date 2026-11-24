@@ -40,6 +40,9 @@ class Plugin extends BasePlugin
     public string $schemaVersion = '1.1.0';
     public bool $hasCpSettings = true;
 
+    /** Whether alerts had somewhere to go before the settings being saved. */
+    private bool $hadChannels = true;
+
     public static function config(): array
     {
         return [
@@ -87,14 +90,30 @@ class Plugin extends BasePlugin
     }
 
     /**
-     * The ignore list comes from the settings page as text, one a line.
+     * Notes whether alerts had somewhere to go, from the settings as they were saved before (the project config
+     * isn’t updated yet), with the config file’s on top.
      */
-    public function setSettings(array $settings): void
+    public function beforeSaveSettings(): bool
     {
-        if (isset($settings['ignore']) && is_string($settings['ignore'])) {
-            $settings['ignore'] = array_values(array_filter(array_map('trim', preg_split('/\R/', $settings['ignore']))));
+        $saved = Craft::$app->getProjectConfig()->get('plugins.' . $this->handle . '.settings') ?? [];
+        $old = new Settings();
+        $old->setAttributes(array_merge(is_array($saved) ? $saved : [], Craft::$app->getConfig()->getConfigFromFile($this->handle)), false);
+        $this->hadChannels = $old->hasChannels();
+
+        return parent::beforeSaveSettings();
+    }
+
+    /**
+     * When alerts first get somewhere to go, the problems found before then (which only went to the log) are sent
+     * with the next check, rather than a day later as reminders.
+     */
+    public function afterSaveSettings(): void
+    {
+        parent::afterSaveSettings();
+        if (!$this->hadChannels && $this->getSettings()->hasChannels()) {
+            $this->checker->resendAll();
         }
-        parent::setSettings($settings);
+        $this->hadChannels = true;
     }
 
     protected function settingsHtml(): ?string

@@ -112,6 +112,44 @@ class Settings extends Model
     public string $emailTemplate = '';
 
     /**
+     * Lists set as text, one a line (the settings page’s Don’t watch), are split into their lines. Craft’s settings
+     * page sets them as one string, which Craft makes a list of one; lists saved that way before are split too.
+     */
+    public function setAttributes($values, $safeOnly = true): void
+    {
+        parent::setAttributes($values, $safeOnly);
+        foreach (['ignore', 'allowOverlap', 'redact'] as $name) {
+            $this->$name = self::lines($this->$name);
+        }
+    }
+
+    /**
+     * @param string[]|string $value
+     * @return string[]
+     */
+    public static function lines(array|string $value): array
+    {
+        $lines = [];
+        foreach ((array)$value as $item) {
+            foreach (preg_split('/\R/', (string)$item) as $line) {
+                if (($line = trim($line)) !== '') {
+                    $lines[] = $line;
+                }
+            }
+        }
+
+        return array_values(array_unique($lines));
+    }
+
+    /**
+     * Whether alerts have somewhere to go: an email address, a chat webhook or a webhook.
+     */
+    public function hasChannels(): bool
+    {
+        return $this->emailList() || (string)App::parseEnv($this->chatWebhook) !== '' || (string)App::parseEnv($this->webhookUrl) !== '';
+    }
+
+    /**
      * @return string[]
      */
     public function emailList(): array
