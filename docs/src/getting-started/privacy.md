@@ -20,7 +20,7 @@ Only alerts, and only to the channels you set: email through Craft's mailer, you
 
 Before an alert goes out, secrets are masked in it as well, in command names too (`sync --api-token=••••`), and email addresses are shortened to their first letter and domain (`j••••@example.com`). The control panel shows them in full.
 
-Error messages and logged errors can still hold other details, such as a file path, an order number or a customer's name. To keep logged errors out of alerts, for alerts that go to a shared channel, set `logInAlerts` to `false`: they stay on each command's page.
+Error messages can still hold other details, such as a file path or an order number. The errors a failed run logged stay on its command's page and aren't put in alerts, as they're more likely to hold a site's data, such as a customer's name. Set `logInAlerts` to `true` to have the last few in each alert too.
 
 ## The health URL
 

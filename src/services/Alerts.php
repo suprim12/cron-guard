@@ -81,7 +81,7 @@ class Alerts extends Component
 
     /**
      * A command’s status as it may leave the server: secrets and email addresses masked in its name, message and log
-     * (runs recorded before 1.1.0 weren’t masked as they were saved), and no log when `logInAlerts` is off.
+     * (runs recorded before 1.1.0 weren’t masked as they were saved), and no log unless `logInAlerts` is on.
      *
      * @param array<string, mixed> $status
      * @return array<string, mixed>

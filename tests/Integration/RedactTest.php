@@ -87,6 +87,7 @@ class RedactTest extends TestCase
         if (!\Craft::$app->getDb()->columnExists(\suprim\cronguard\services\Runs::TABLE_RUNS, 'log')) {
             $this->markTestSkipped('Run the 1.1.0 migrations first.');
         }
+        $this->settings()->logInAlerts = true;
         $this->plugin()->checker->check([$this->failingWithLog()]);
         $alert = $this->alerts[0];
 
@@ -97,12 +98,12 @@ class RedactTest extends TestCase
         $this->assertStringNotContainsString('abc123xyz', $this->plugin()->alerts->emailHtml($alert));
     }
 
-    public function testLogCanStayInTheControlPanel(): void
+    public function testLogStaysInTheControlPanelByDefault(): void
     {
         if (!\Craft::$app->getDb()->columnExists(\suprim\cronguard\services\Runs::TABLE_RUNS, 'log')) {
             $this->markTestSkipped('Run the 1.1.0 migrations first.');
         }
-        $this->settings()->logInAlerts = false;
+        $this->assertFalse((new \suprim\cronguard\models\Settings())->logInAlerts, 'Off unless it’s turned on.');
         $id = $this->failingWithLog();
         $this->plugin()->checker->check([$id]);
 

@@ -88,10 +88,11 @@ class Settings extends Model
     public array $allowOverlap = ['queue/run'];
 
     /**
-     * Put the errors a failed run logged in alerts. Off keeps them in the control panel only, for alerts that go to a
-     * shared channel. Secrets are masked either way, and email addresses in alerts.
+     * Put the errors a failed run logged in alerts too. Off by default: logged messages can hold a site’s data, such as
+     * customers’ details, and alerts often go to a shared channel. They’re on each command’s page either way, with
+     * secrets masked, and email addresses masked in alerts.
      */
-    public bool $logInAlerts = true;
+    public bool $logInAlerts = false;
 
     /**
      * More regular expressions to mask in error and log messages before they’re saved, such as `/ACME-[0-9A-F]{32}/`,

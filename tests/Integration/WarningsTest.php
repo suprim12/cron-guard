@@ -125,6 +125,7 @@ class WarningsTest extends TestCase
     public function testAlertsSayWhatWasLogged(): void
     {
         $this->requireColumns();
+        $this->settings()->logInAlerts = true;
         $runs = $this->every(300, 5);
         $runs[0] += ['exitCode' => 1, 'error' => 'Import failed', 'log' => json_encode([
             ['level' => 'warning', 'category' => 'feed', 'message' => 'Retrying'],

@@ -23,7 +23,7 @@ return [
     'stuckMinutes' => 60,
     'memoryWarnPercent' => 85,
     'allowOverlap' => ['queue/run'],
-    'logInAlerts' => true,
+    'logInAlerts' => false,
     'redact' => [],
     'checkFromWeb' => true,
     'emailTemplate' => '',
@@ -46,7 +46,7 @@ return [
 | `stuckMinutes` | `60` | Minutes a run may take before it counts as stuck, unless it usually takes longer. |
 | `memoryWarnPercent` | `85` | Percent of PHP's memory limit a run may use before its command is reported as near the limit. `0` turns it off. |
 | `allowOverlap` | `['queue/run']` | Commands meant to run more than once at a time, with `*` for any part, which aren't reported as overlapping. |
-| `logInAlerts` | `true` | Put the errors a failed run logged in alerts. `false` keeps them on the command's page only. Secrets are masked either way. |
+| `logInAlerts` | `false` | Put the last few errors a failed run logged in alerts too, and all of them in the webhook's `log`. They're on the command's page either way. Secrets are masked, and email addresses in alerts. |
 | `redact` | `[]` | More regular expressions to mask in error and log messages before they're saved, such as `'/ACME-[0-9A-F]{32}/'`. Passwords, tokens, keys and credentials in URLs are masked already. |
 | `checkFromWeb` | `true` | Run the check after control panel and site requests too, at most every five minutes. |
 | `emailTemplate` | | A site template for alert emails, in Twig or MJML. See [Email Templates](../guides/email-templates). |

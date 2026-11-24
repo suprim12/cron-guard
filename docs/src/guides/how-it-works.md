@@ -29,7 +29,7 @@ You can also [set a schedule](../getting-started/configuration#when-to-set-a-sch
 | **Slow** | The last run took three times its usual time, and over a minute longer. Needs five runs to compare with. |
 | **Memory** | The last run used 85% or more of PHP's memory limit (`memoryWarnPercent`), so it's close to being killed for running out. Where PHP on the command line has no limit, as it often doesn't, there's nothing to warn about. |
 
-A failed run keeps the errors and warnings Craft logged while it ran, the last 20. They're on its command's page, and the last few errors are in the alert.
+A failed run keeps the errors and warnings Craft logged while it ran, the last 20. They're on its command's page, and in alerts too with `logInAlerts` on.
 
 When every command with a schedule is missed at once, the alert says **cron isn't running** rather than listing each one.
 

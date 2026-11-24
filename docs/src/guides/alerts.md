@@ -60,7 +60,7 @@ Alerts are posted to the **Webhook** URL as JSON:
 }
 ```
 
-`state` is one of `failing`, `stuck`, `overlapping`, `overdue`, `slow` or `memory`. `log` has the errors and warnings a failed run logged, and is empty otherwise. `stopped` is `true` when every scheduled command is late at once.
+`state` is one of `failing`, `stuck`, `overlapping`, `overdue`, `slow` or `memory`. `log` has the errors and warnings a failed run logged when `logInAlerts` is on, and is empty otherwise. `stopped` is `true` when every scheduled command is late at once.
 
 ## Test alerts
 
