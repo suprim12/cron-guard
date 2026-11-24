@@ -12,6 +12,7 @@ namespace suprim\cronguard\controllers;
 use Craft;
 use craft\helpers\App;
 use craft\web\Controller;
+use suprim\cronguard\helpers\Redact;
 use suprim\cronguard\Plugin;
 use suprim\cronguard\services\Checker;
 use yii\web\NotFoundHttpException;
@@ -43,9 +44,10 @@ class HealthController extends Controller
 
         $response = $this->asJson([
             'status' => $problems ? 'problem' : 'ok',
-            'problems' => array_map(fn($s) => ['command' => $s['command'], 'state' => $s['state'], 'message' => $s['message']], $problems),
+            // Masked, as anyone with the token sees it.
+            'problems' => array_map(fn($s) => ['command' => Redact::outgoing($s['command']), 'state' => $s['state'], 'message' => Redact::outgoing($s['message'])], $problems),
             'commands' => array_map(fn($s) => [
-                'command' => $s['command'],
+                'command' => Redact::outgoing($s['command']),
                 'state' => $s['state'],
                 'lastStartedAt' => $s['lastStart'] ? gmdate('c', $s['lastStart']) : null,
             ], $statuses),

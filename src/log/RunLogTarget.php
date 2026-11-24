@@ -10,6 +10,7 @@
 namespace suprim\cronguard\log;
 
 use Craft;
+use suprim\cronguard\helpers\Redact;
 use Throwable;
 use yii\helpers\VarDumper;
 use yii\log\Logger;
@@ -55,7 +56,8 @@ class RunLogTarget extends Target
             $this->entries[] = [
                 'level' => $level === Logger::LEVEL_ERROR ? 'error' : 'warning',
                 'category' => mb_substr((string)$category, 0, 120),
-                'message' => mb_substr($this->text($text), 0, self::MESSAGE_LENGTH),
+                // Masked before it’s kept, so a secret in a message is never saved.
+                'message' => mb_substr(Redact::secrets($this->text($text)), 0, self::MESSAGE_LENGTH),
             ];
         }
         if (count($this->entries) > self::KEEP) {

@@ -7,6 +7,7 @@
 - A failed run keeps the errors and warnings Craft logged while it ran, so you can see why it failed without opening log files. They’re on its command’s page, the last few errors are in the alert, and all of them are in the webhook’s `log`.
 - Commands near their memory limit: a run that used 85% or more of PHP’s memory limit is reported before the command is killed for running out (`memoryWarnPercent`). Each run’s memory shows with the limit.
 - Overlapping runs: two or more runs of a command going at once, as each takes longer than the time between them, are reported. `queue/run` is left out, as Craft runs several side by side (`allowOverlap`).
+- Secrets are masked before error and log messages are saved: passwords, tokens and keys, credentials in URLs, and well-known key formats, with your own patterns in `redact`. Alerts and the health URL mask them in command names too, and shorten email addresses. `logInAlerts` keeps logged errors out of alerts.
 - Mute a command for an hour, a day or a week, as well as until you turn it off. It’s watched again on its own when the time is up, and a problem still there is sent then.
 
 ### Fixed

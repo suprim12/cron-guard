@@ -87,6 +87,20 @@ class Settings extends Model
      */
     public array $allowOverlap = ['queue/run'];
 
+    /**
+     * Put the errors a failed run logged in alerts. Off keeps them in the control panel only, for alerts that go to a
+     * shared channel. Secrets are masked either way, and email addresses in alerts.
+     */
+    public bool $logInAlerts = true;
+
+    /**
+     * More regular expressions to mask in error and log messages before they’re saved, such as `/ACME-[0-9A-F]{32}/`,
+     * on top of passwords, tokens, keys and credentials in URLs.
+     *
+     * @var string[]
+     */
+    public array $redact = [];
+
     /** Run the check, at most every five minutes, after control panel and site requests too. */
     public bool $checkFromWeb = true;
 

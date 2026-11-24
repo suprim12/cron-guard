@@ -14,6 +14,7 @@ use craft\helpers\App;
 use craft\helpers\UrlHelper;
 use craft\web\View;
 use suprim\cronguard\events\AlertEvent;
+use suprim\cronguard\helpers\Redact;
 use suprim\cronguard\Plugin;
 use Throwable;
 use yii\base\Component;
@@ -39,6 +40,8 @@ class Alerts extends Component
      */
     public function send(array $alert, bool $test = false): array
     {
+        $alert['problems'] = array_map([$this, 'outgoing'], $alert['problems']);
+        $alert['recovered'] = array_map([$this, 'outgoing'], $alert['recovered']);
         $event = new AlertEvent([
             'problems' => $alert['problems'],
             'recovered' => $alert['recovered'],
@@ -74,6 +77,24 @@ class Alerts extends Component
         }
 
         return $results;
+    }
+
+    /**
+     * A command’s status as it may leave the server: secrets and email addresses masked in its name, message and log
+     * (runs recorded before 1.1.0 weren’t masked as they were saved), and no log when `logInAlerts` is off.
+     *
+     * @param array<string, mixed> $status
+     * @return array<string, mixed>
+     */
+    public function outgoing(array $status): array
+    {
+        $status['command'] = Redact::outgoing((string)$status['command']);
+        $status['message'] = Redact::outgoing((string)$status['message']);
+        $status['log'] = Plugin::getInstance()->getSettings()->logInAlerts
+            ? array_map(fn($entry) => ['message' => Redact::outgoing((string)$entry['message'])] + $entry, $status['log'] ?? [])
+            : [];
+
+        return $status;
     }
 
     /**

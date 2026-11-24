@@ -14,6 +14,7 @@ use craft\db\Query;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use DateTime;
+use suprim\cronguard\helpers\Redact;
 use suprim\cronguard\log\RunLogTarget;
 use suprim\cronguard\Plugin;
 use Throwable;
@@ -152,7 +153,7 @@ class Runs extends Component
                 'finishedAt' => Db::prepareDateForDb(new DateTime()),
                 'durationMs' => (int)round((microtime(true) - $current['started']) * 1000),
                 'exitCode' => $exitCode,
-                'error' => $error !== null ? StringHelper::safeTruncate($error, 2000) : null,
+                'error' => $error !== null ? StringHelper::safeTruncate(Redact::secrets($error), 2000) : null,
                 'memory' => memory_get_peak_usage(true),
             ];
             if ($this->hasColumn('memoryLimit')) {
